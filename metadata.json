@@ -1,0 +1,7 @@
+{
+  "name": "VECTORA — Generative SVG Design Studio",
+  "description": "Generative SVG design studio and precision vector engineering environment for hand-crafted and AI-driven vector art.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+
