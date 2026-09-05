@@ -22,6 +22,7 @@ import { AIGeneratorModal } from './components/AIGeneratorModal';
 import { ImportModal } from './components/ImportModal';
 import { RefinePromptBar } from './components/RefinePromptBar';
 import { ExportModal } from './components/ExportModal';
+import { AnimationStudio } from './components/AnimationStudio';
 import {
   parseSvgLayers,
   extractSvgColors,
@@ -36,12 +37,22 @@ import {
   injectReusableComponent,
   downloadBlob
 } from './utils/svgParser';
-import { Sparkles, MessageSquare, ChevronUp, ChevronDown } from 'lucide-react';
+import { Sparkles, MessageSquare, ChevronUp, ChevronDown, AlertCircle, X } from 'lucide-react';
 
 export function App() {
   const [currentArtwork, setCurrentArtwork] = useState<VectorArtwork>(MASTERPIECES[0]);
   const [currentTab, setCurrentTab] = useState<StudioTab>('canvas');
   const [layers, setLayers] = useState<LayerSpec[]>(() => parseSvgLayers(MASTERPIECES[0].svg));
+
+  // Global Notification State
+  const [notification, setNotification] = useState<{ message: string; type: 'error' | 'success' | 'info' } | null>(null);
+
+  useEffect(() => {
+    if (notification) {
+      const timer = setTimeout(() => setNotification(null), 6000);
+      return () => clearTimeout(timer);
+    }
+  }, [notification]);
 
   // Workspace Layout State
   const [workspaceLayout, setWorkspaceLayout] = useState<WorkspaceLayout>(() => {
@@ -399,30 +410,44 @@ export function App() {
 
       if (res.ok) {
         const data = await res.json();
-        if (data.artwork && data.artwork.svg) {
+        if (data.success && data.data && data.data.svg) {
+          const generated = data.data;
           const newArt: VectorArtwork = {
             id: `ai-art-${Date.now()}`,
-            title: data.artwork.title || prompt.slice(0, 30),
-            subtitle: data.artwork.subtitle || `${style} Generative Object`,
-            style: data.artwork.style || style,
-            concept: data.artwork.concept || prompt,
-            viewBox: data.artwork.viewBox || '0 0 1000 1000',
-            palette: data.artwork.palette || extractSvgColors(data.artwork.svg),
-            layers: data.artwork.layers || parseSvgLayers(data.artwork.svg),
-            evolutionIdeas: data.artwork.evolutionIdeas || [
+            title: generated.title || prompt.slice(0, 30),
+            subtitle: `${style} Generative Object`,
+            style: generated.style || style,
+            concept: generated.concept || prompt,
+            viewBox: '0 0 1000 1000',
+            palette: generated.palette || extractSvgColors(generated.svg),
+            layers: generated.layers || parseSvgLayers(generated.svg),
+            evolutionIdeas: generated.evolutionIdeas || [
               'Add animated rotation keyframes to the central ring',
               'Introduce dynamic stroke-dashoffset tracing',
             ],
-            svg: data.artwork.svg,
+            svg: generated.svg,
           };
           handleArtworkImported(newArt);
           setIsAIGeneratorOpen(false);
+          setNotification({ message: 'Vector masterpiece generated successfully!', type: 'success' });
           return;
         }
       }
-      throw new Error('API generation failed or key missing');
-    } catch (err) {
-      console.warn('Backend generation failed, utilizing client procedural synthesis:', err);
+      
+      const contentType = res.headers.get('content-type');
+      if (contentType && contentType.includes('application/json')) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || 'API generation failed');
+      } else {
+        throw new Error(`Server error: ${res.status} ${res.statusText}`);
+      }
+    } catch (err: any) {
+      console.warn('Backend generation failed:', err);
+      setNotification({ 
+        message: err.message || 'The AI engine is currently busy. Utilizing local procedural synthesis.', 
+        type: 'error' 
+      });
+
       const matching = MASTERPIECES.find((m) => m.style.toLowerCase().includes(style.toLowerCase())) || MASTERPIECES[0];
       const fallbackArt: VectorArtwork = {
         ...matching,
@@ -450,20 +475,30 @@ export function App() {
 
       if (res.ok) {
         const data = await res.json();
-        if (data.artwork && data.artwork.svg) {
+        if (data.success && data.data && data.data.svg) {
+          const refined = data.data;
           setCurrentArtwork((prev) => ({
             ...prev,
-            svg: data.artwork.svg,
+            svg: refined.svg,
             concept: `${prev.concept} • Refined: ${instruction}`,
-            palette: data.artwork.palette || extractSvgColors(data.artwork.svg),
-            layers: data.artwork.layers || parseSvgLayers(data.artwork.svg),
+            palette: refined.palette || extractSvgColors(refined.svg),
+            layers: refined.layers || parseSvgLayers(refined.svg),
           }));
+          setNotification({ message: 'Design evolution applied successfully!', type: 'success' });
           return;
         }
       }
-      throw new Error('Refinement failed');
-    } catch (err) {
-      console.warn('Refinement server call returned error:', err);
+
+      const contentType = res.headers.get('content-type');
+      if (contentType && contentType.includes('application/json')) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || 'Refinement failed');
+      } else {
+        throw new Error(`Server error: ${res.status} ${res.statusText}`);
+      }
+    } catch (err: any) {
+      console.warn('Refinement error:', err);
+      setNotification({ message: err.message, type: 'error' });
     } finally {
       setIsRefining(false);
     }
@@ -505,6 +540,7 @@ export function App() {
               showLayers={showLayers}
               onOpenExport={() => setIsExportOpen(true)}
               onOpenImport={() => setIsImportOpen(true)}
+              onOpenAnimator={() => setCurrentTab('animator')}
               onUpdateSettings={handleUpdateSettings}
               onUndo={handleUndo}
               onRedo={handleRedo}
@@ -621,6 +657,15 @@ export function App() {
           />
         )}
 
+        {/* TAB: Kinetic SVG Animation Studio */}
+        {currentTab === 'animator' && (
+          <AnimationStudio
+            artwork={currentArtwork}
+            onUpdateSvg={handleUpdateSvg}
+            onSwitchToCanvas={() => setCurrentTab('canvas')}
+          />
+        )}
+
         {/* TAB 4: Live SVG Code & AST Inspector */}
         {currentTab === 'editor' && (
           <CodeEditor
@@ -664,6 +709,44 @@ export function App() {
         onClose={() => setIsExportOpen(false)}
         artwork={currentArtwork}
       />
+
+      {/* Global Notification Toast */}
+      <AnimatePresence>
+        {notification && (
+          <motion.div
+            initial={{ y: 20, opacity: 0, scale: 0.95 }}
+            animate={{ y: 0, opacity: 1, scale: 1 }}
+            exit={{ y: 20, opacity: 0, scale: 0.95 }}
+            className={`fixed bottom-6 right-6 z-[100] min-w-[300px] max-w-md p-4 shadow-2xl border-l-4 flex items-start gap-3 backdrop-blur-md ${
+              notification.type === 'error'
+                ? 'bg-[#1A0A0A]/95 border-[#FF0000] text-[#FF9999]'
+                : notification.type === 'success'
+                ? 'bg-[#0A1A0A]/95 border-[#00FF00] text-[#99FF99]'
+                : 'bg-[#0A0A1A]/95 border-[#00FFFF] text-[#99FFFF]'
+            }`}
+          >
+            <div className="shrink-0 pt-0.5">
+              {notification.type === 'error' ? (
+                <AlertCircle className="w-5 h-5 text-[#FF0000]" />
+              ) : (
+                <Sparkles className="w-5 h-5 text-[#00FF00]" />
+              )}
+            </div>
+            <div className="flex-1 pr-4">
+              <div className="text-[10px] uppercase font-black tracking-widest mb-1 opacity-70">
+                {notification.type === 'error' ? 'System Error' : 'System Update'}
+              </div>
+              <div className="text-xs font-mono leading-relaxed">{notification.message}</div>
+            </div>
+            <button
+              onClick={() => setNotification(null)}
+              className="absolute top-2 right-2 p-1 hover:bg-white/10 transition-colors"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

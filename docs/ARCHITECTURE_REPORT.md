@@ -12,7 +12,7 @@
 ```
 
 > **System Name:** VECTORA Studio  
-> **Release Version:** v2.5.0 Production Workstation  
+> **Release Version:** v2.6.0 Production Workstation  
 > **Architecture:** Full-Stack Reactive Vector Studio (React + Vite + Express + Node.js + Gemini Flash Vision & AI)  
 > **Authors & Engineering:** VECTORA System Core Engineering  
 > **Documentation Target:** `/docs/ARCHITECTURE_REPORT.md`  
@@ -122,6 +122,24 @@ The server encapsulates the modern `@google/genai` TypeScript SDK:
   - **Image Input**: Scans uploaded base64 bitmap images, extracting primary visual hierarchy, bounding forms, and color palettes, generating an authentic vector reproduction.
   - **Document Input**: Analyzes specifications, markdown docs, and telemetry data to generate illustrative or diagrammatic vector compositions.
 
+### 3.7 Kinetic Animation Studio (`src/components/AnimationStudio.tsx`)
+VECTORA features a professional-grade SVG animation workstation that compiles complex motion into pure CSS keyframes:
+- **`injectSvgAnimations(svgString, config)`**: Surgically injects `<style>` blocks containing `@keyframes` and class assignments without bloating the SVG structure.
+- **Motion Presets**: Catalog of 15+ curated effects including *Laser Path Trace*, *Cybernetic Glitch*, *Radar Telemetry Beam*, and *Cinematic Levitation*.
+- **Motion Trail Engine**: Automatically generates staggered opacity clones of animated paths to simulate cinematic motion blur.
+- **Global Playback Controls**: Real-time speed scaling, easing function selection (Cubic Bezier, Stepped, Linear), and loop mode configuration (*Infinite*, *Once*, *Alternate*).
+- **GIF Encoding (`src/utils/gifRenderer.ts`)**: Utilizes `gif.js` to capture high-fidelity 60FPS timeline slices and encode them into standalone animated GIFs directly in the browser.
+
+### 3.8 Animation Sync Engine (`src/components/AnimationSyncManager.tsx`)
+Enables complex relationship mapping between disparate vector layers:
+- **Sync Groups**: Linking multiple layers to shared timing, duration, and easing parameters.
+- **Phase Offsetting**: Maintaining group synchronization while introducing relative timing shifts.
+
+### 3.9 Robust AI Reliability & Error Handling (`server.ts` & `App.tsx`)
+- **Exponential Backoff Retries**: Server-side AI calls are wrapped in a `withRetry` utility that automatically handles transient 503 "High Demand" errors with jittered backoff.
+- **Graceful Procedural Fallbacks**: If the AI engine remains busy after all retries, the system seamlessly transitions to local procedural synthesis to maintain a continuous creative workflow.
+- **Global Notification System**: Real-time visual toasts providing status updates on AI generation, refinement successes, and detailed technical error reporting.
+
 ### 3.3 Visual Layer Hierarchy & Tree Management (`src/components/LayerPanel.tsx`)
 - **Hierarchical Tree Display**: Visual branch connectors depicting nested depth.
 - **Interactive Container Controls**: Expand/collapse buttons (`ChevronDown` / `ChevronRight`), **Collapse All**, and **Expand All**.
@@ -190,16 +208,18 @@ VECTORA comes bundled with production-grade vector blueprints demonstrating the 
 │   └── APP_REPORT.md               # Executive summary report
 ├── src/
 │   ├── main.tsx                    # React application bootstrap
-│   ├── App.tsx                     # Main Studio workspace, state management, hotkey listener
+│   ├── App.tsx                     # Main Studio workspace, state management, notification system
 │   ├── index.css                   # Global styles & custom scrollbars
-│   ├── types.ts                    # Global TypeScript interfaces, enums, and types
+│   ├── types.ts                    # Global TypeScript interfaces, enums, and sync group types
 │   ├── data/
 │   │   ├── masterpieces.ts         # Pre-configured SVG masterpiece catalog
 │   │   ├── palettes.ts             # Curated color palettes & harmonic schemes
 │   │   ├── reusableComponents.ts   # Reusable vector patterns & component library
 │   │   └── vectoraBasePalette.ts   # Core VECTORA studio color definitions
 │   ├── utils/
-│   │   └── svgParser.ts            # Live DOMParser, AST tree parser, color remapper, layer engine
+│   │   ├── svgParser.ts            # Live DOMParser, AST tree parser, color remapper, layer engine
+│   │   ├── svgAnimator.ts          # CSS Keyframe injection engine & motion preset library
+│   │   └── gifRenderer.ts          # Browser-side GIF encoding & capturing utility
 │   └── components/
 │       ├── StudioCanvas.tsx        # High-performance vector canvas, zoom/pan matrix, grid HUD
 │       ├── Navbar.tsx              # Workspace mode switcher, layout dropdown, quick actions
@@ -213,9 +233,12 @@ VECTORA comes bundled with production-grade vector blueprints demonstrating the 
 │       ├── ImportModal.tsx         # Multimodal image & text document vectorization engine
 │       ├── AIGeneratorModal.tsx    # Generative AI modal with style & complexity selectors
 │       ├── RefinePromptBar.tsx     # Contextual AI natural language refinement bar
-│       └── ExportModal.tsx         # Multi-format preset export workstation (SVG, PNG, TSX, CSS)
+│       ├── ExportModal.tsx         # Multi-format preset export workstation (SVG, PNG, TSX, CSS)
+│       ├── AnimationStudio.tsx     # Kinetic SVG animation workstation & GIF renderer
+│       ├── KeyframeTimeline.tsx    # Visual animation timeline & playback controller
+│       └── AnimationSyncManager.tsx # UI for managing layer animation synchronization
 ```
 
 ---
 
-*Documentation compiled and verified by VECTORA Engineering System v2.5.*
+*Documentation compiled and verified by VECTORA Engineering System v2.6.*

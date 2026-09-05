@@ -167,9 +167,19 @@ export const ImportModal: React.FC<ImportModalProps> = ({
         body: JSON.stringify(payload),
       });
 
+      const contentType = res.headers.get('content-type');
+      if (!res.ok || !contentType || !contentType.includes('application/json')) {
+        let errorMessage = `Server error: ${res.status} ${res.statusText}`;
+        if (contentType && contentType.includes('application/json')) {
+          const errorData = await res.json();
+          errorMessage = errorData.error || errorMessage;
+        }
+        throw new Error(errorMessage);
+      }
+
       const json = await res.json();
 
-      if (!res.ok || !json.success) {
+      if (!json.success) {
         throw new Error(json.error || 'Vectorization failed');
       }
 

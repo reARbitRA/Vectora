@@ -17,7 +17,8 @@ import {
   Maximize2,
   LayoutGrid,
   Minimize2,
-  ChevronDown
+  ChevronDown,
+  Film
 } from 'lucide-react';
 
 interface NavbarProps {
@@ -119,6 +120,19 @@ export const Navbar: React.FC<NavbarProps> = ({
           >
             <Sparkles className="w-3.5 h-3.5" />
             <span>Components</span>
+          </button>
+
+          <button
+            id="nav-tab-animator"
+            onClick={() => onSelectTab('animator')}
+            className={`flex items-center gap-1.5 px-2.5 md:px-3 py-1 text-xs font-mono uppercase tracking-wider transition-all whitespace-nowrap ${
+              currentTab === 'animator'
+                ? 'bg-[#00FF00] text-[#000000] font-bold'
+                : 'text-[#888888] hover:text-[#00FF00] hover:bg-[#222222]'
+            }`}
+          >
+            <Film className="w-3.5 h-3.5 text-[#00FF00]" />
+            <span>Animate</span>
           </button>
 
           <button

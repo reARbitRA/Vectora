@@ -99,9 +99,86 @@ export interface SvgMetrics {
   };
 }
 
-export type StudioTab = 'canvas' | 'editor' | 'specs' | 'gallery' | 'generator' | 'palettes' | 'components';
+export type StudioTab = 'canvas' | 'editor' | 'specs' | 'gallery' | 'generator' | 'palettes' | 'components' | 'animator';
 
 export type WorkspaceLayout = 'full' | 'minimalist' | 'canvas-focus';
+
+export type AnimationPresetId =
+  | 'orchestrated-composite'
+  | 'pulse-breath'
+  | 'orbit-spin'
+  | 'wiggle'
+  | 'bounce'
+  | 'path-draw'
+  | 'radar-sweep'
+  | 'float-hover'
+  | 'glitch-surge'
+  | 'color-shimmer'
+  | 'neon-flicker'
+  | 'wave-oscillate';
+
+export type AnimationLoopMode = 'infinite' | 'once' | 'alternate';
+
+export interface KeyframeNode {
+  id: string;
+  percentage: number; // 0 to 100
+  label: string;
+  isRemovable?: boolean;
+}
+
+export interface LayerAnimationConfig {
+  type: AnimationPresetId | 'none';
+  duration: number; // in seconds
+  delay: number; // in seconds
+  direction?: 'normal' | 'reverse' | 'alternate';
+  easing?: string;
+  intensity?: number;
+}
+
+export interface AnimationSyncGroup {
+  id: string;
+  name: string;
+  layerNames: string[]; // layer ids or inkscape:labels
+  color: string; // visual accent color badge (e.g. #00FF00, #00FFFF, #FF00FF, #FFB800, #E11D48)
+  preset: AnimationPresetId;
+  duration: number; // in seconds
+  speed: number;
+  easing: string;
+  delay: number; // in seconds
+  direction: 'normal' | 'reverse' | 'alternate';
+  keyframes?: KeyframeNode[];
+  active: boolean;
+}
+
+export interface AnimationConfig {
+  enabled: boolean;
+  preset: AnimationPresetId;
+  speed: number; // multiplier e.g. 1
+  duration: number; // base duration in seconds
+  easing: string;
+  direction: 'normal' | 'reverse' | 'alternate';
+  iterationCount: 'infinite' | number;
+  loopMode: AnimationLoopMode; // 'infinite' | 'once' | 'alternate'
+  motionTrail: boolean; // Motion trail / staggered opacity clone blur toggle
+  motionTrailCount: number; // Number of trail clones (e.g. 3)
+  motionTrailOpacity: number; // Falloff base opacity (e.g. 0.35)
+  autoBake: boolean; // Real-time auto-bake toggle into master SVG
+  keyframes?: KeyframeNode[];
+  syncGroups?: AnimationSyncGroup[];
+  activeSyncGroupId?: string | null;
+  isPaused: boolean;
+  layerOverrides: Record<string, LayerAnimationConfig>;
+}
+
+export interface AnimationPresetMeta {
+  id: AnimationPresetId;
+  name: string;
+  tagline: string;
+  description: string;
+  icon: string;
+  recommendedDuration: number;
+  bestFor: string;
+}
 
 export interface LayerHierarchyNode {
   id: string;
@@ -138,7 +215,7 @@ export interface ExportPreset {
   id: string;
   name: string;
   description: string;
-  tab: 'svg' | 'png' | 'react' | 'datauri';
+  tab: 'svg' | 'png' | 'react' | 'datauri' | 'spritesheet';
   pngScale?: number;
   cleanOptimize?: boolean;
   stripInkscape?: boolean;

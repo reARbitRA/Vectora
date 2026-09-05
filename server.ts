@@ -27,6 +27,39 @@ function getAI(): GoogleGenAI | null {
   return aiClient;
 }
 
+/**
+ * Utility to retry AI calls on transient errors (like 503)
+ */
+async function withRetry<T>(
+  operation: () => Promise<T>,
+  retries = 3,
+  delay = 1000
+): Promise<T> {
+  let lastError: any;
+  for (let i = 0; i < retries; i++) {
+    try {
+      return await operation();
+    } catch (error: any) {
+      lastError = error;
+      // 503 Service Unavailable or "high demand" errors are candidates for retry
+      const isTransient = 
+        error?.message?.includes("503") || 
+        error?.message?.toLowerCase().includes("high demand") ||
+        error?.message?.toLowerCase().includes("overloaded") ||
+        error?.status === "UNAVAILABLE";
+      
+      if (isTransient && i < retries - 1) {
+        console.warn(`Gemini API transient error (attempt ${i + 1}/${retries}). Retrying in ${delay}ms...`);
+        await new Promise((resolve) => setTimeout(resolve, delay));
+        delay *= 2; // Exponential backoff
+        continue;
+      }
+      throw error;
+    }
+  }
+  throw lastError;
+}
+
 const VECTORA_SYSTEM_PROMPT = `
 You are VECTORA — a world-class Generative SVG Design Engineer operating at the intersection of fine art, visual design theory, and precision front-end engineering.
 
@@ -122,15 +155,15 @@ Ensure the SVG adheres to the complete VECTORA engineering and artistic doctrine
 - Output MUST be valid JSON conforming to the schema.
 `;
 
-    const response = await ai.models.generateContent({
-      model: "gemini-3.8-flash",
+    const response = await withRetry(() => ai.models.generateContent({
+      model: "gemini-1.5-flash",
       contents: userPrompt,
       config: {
         systemInstruction: VECTORA_SYSTEM_PROMPT,
         responseMimeType: "application/json",
         temperature: 0.7,
       },
-    });
+    }));
 
     const text = response.text || "{}";
     const parsed = JSON.parse(text);
@@ -138,9 +171,13 @@ Ensure the SVG adheres to the complete VECTORA engineering and artistic doctrine
     return res.json({ success: true, data: parsed });
   } catch (error: any) {
     console.error("SVG Generation error:", error);
-    return res.status(500).json({
-      error: error.message || "Failed to generate vector artwork",
+    const isTransient = error?.message?.includes("503") || error?.status === "UNAVAILABLE" || error?.message?.toLowerCase().includes("high demand");
+    return res.status(isTransient ? 503 : 500).json({
+      error: isTransient 
+        ? "The AI design engine is currently experiencing high demand. Please try again in a few moments." 
+        : (error.message || "Failed to generate vector artwork"),
       fallbackAvailable: true,
+      isTransient,
     });
   }
 });
@@ -176,15 +213,15 @@ Refactor and refine the SVG according to the user's instructions while preservin
 Output MUST be valid JSON conforming to the schema.
 `;
 
-    const response = await ai.models.generateContent({
-      model: "gemini-3.8-flash",
+    const response = await withRetry(() => ai.models.generateContent({
+      model: "gemini-1.5-flash",
       contents: userPrompt,
       config: {
         systemInstruction: VECTORA_SYSTEM_PROMPT,
         responseMimeType: "application/json",
         temperature: 0.6,
       },
-    });
+    }));
 
     const text = response.text || "{}";
     const parsed = JSON.parse(text);
@@ -192,8 +229,12 @@ Output MUST be valid JSON conforming to the schema.
     return res.json({ success: true, data: parsed });
   } catch (error: any) {
     console.error("SVG Refinement error:", error);
-    return res.status(500).json({
-      error: error.message || "Failed to refine vector artwork",
+    const isTransient = error?.message?.includes("503") || error?.status === "UNAVAILABLE" || error?.message?.toLowerCase().includes("high demand");
+    return res.status(isTransient ? 503 : 500).json({
+      error: isTransient 
+        ? "The refinement engine is temporarily busy. Please try again in a few moments." 
+        : (error.message || "Failed to refine vector artwork"),
+      isTransient,
     });
   }
 });
@@ -272,8 +313,8 @@ TASK:
 4. Output MUST be valid JSON matching the schema.
 `;
 
-      const response = await ai.models.generateContent({
-        model: "gemini-3.8-flash",
+      const response = await withRetry(() => ai.models.generateContent({
+        model: "gemini-1.5-flash",
         contents: {
           parts: [imagePart, { text: promptText }],
         },
@@ -282,7 +323,7 @@ TASK:
           responseMimeType: "application/json",
           temperature: 0.6,
         },
-      });
+      }));
 
       const text = response.text || "{}";
       const parsed = JSON.parse(text);
@@ -308,15 +349,15 @@ TASK:
 4. Output MUST be valid JSON conforming to the schema.
 `;
 
-      const response = await ai.models.generateContent({
-        model: "gemini-3.8-flash",
+      const response = await withRetry(() => ai.models.generateContent({
+        model: "gemini-1.5-flash",
         contents: promptText,
         config: {
           systemInstruction: VECTORA_SYSTEM_PROMPT,
           responseMimeType: "application/json",
           temperature: 0.7,
         },
-      });
+      }));
 
       const text = response.text || "{}";
       const parsed = JSON.parse(text);
@@ -326,9 +367,75 @@ TASK:
     }
   } catch (error: any) {
     console.error("Import Vectorize error:", error);
-    return res.status(500).json({
-      error: error.message || "Failed to scan and vectorize input",
+    const isTransient = error?.message?.includes("503") || error?.status === "UNAVAILABLE" || error?.message?.toLowerCase().includes("high demand");
+    return res.status(isTransient ? 503 : 500).json({
+      error: isTransient 
+        ? "The vectorization engine is under high load. Please retry your import in a few moments." 
+        : (error.message || "Failed to scan and vectorize input"),
       fallbackAvailable: true,
+      isTransient,
+    });
+  }
+});
+
+// AI-Powered SVG Kinetic Animation Endpoint
+app.post("/api/animate-svg", async (req, res) => {
+  try {
+    const { currentSvg, animationStyle = "orchestrated", title = "Artwork", speed = 1 } = req.body;
+
+    if (!currentSvg) {
+      return res.status(400).json({ error: "SVG content is required" });
+    }
+
+    const ai = getAI();
+    if (!ai) {
+      return res.status(503).json({
+        error: "GEMINI_API_KEY is not configured",
+        isOffline: true,
+      });
+    }
+
+    const userPrompt = `
+You are VECTORA Motion Choreographer.
+Animate this static vector SVG artwork titled "${title}".
+Requested Animation Theme/Motion Direction: "${animationStyle}".
+Playback Velocity: ${speed}x.
+
+SVG Content:
+\`\`\`xml
+${currentSvg}
+\`\`\`
+
+TASK:
+1. Parse the vector layer groups, contours, paths, text nodes, and accents.
+2. Inject a <style id="vectora-animations"> block inside the <defs> or <svg> containing pure GPU-accelerated CSS @keyframes rules.
+3. Assign appropriate class names (e.g. .vec-anim-spin, .vec-anim-draw, .vec-anim-pulse, .vec-anim-glitch, .vec-anim-float) to specific <g> layer containers or <path> elements to bring the artwork to life harmoniously.
+4. Ensure the SVG remains 100% self-contained and valid XML.
+5. Return the updated SVG and motion notes.
+Output MUST be valid JSON conforming to the schema.
+`;
+
+    const response = await withRetry(() => ai.models.generateContent({
+      model: "gemini-1.5-flash",
+      contents: userPrompt,
+      config: {
+        systemInstruction: VECTORA_SYSTEM_PROMPT,
+        responseMimeType: "application/json",
+        temperature: 0.5,
+      },
+    }));
+
+    const text = response.text || "{}";
+    const parsed = JSON.parse(text);
+    return res.json({ success: true, data: parsed });
+  } catch (error: any) {
+    console.error("SVG Animation error:", error);
+    const isTransient = error?.message?.includes("503") || error?.status === "UNAVAILABLE" || error?.message?.toLowerCase().includes("high demand");
+    return res.status(isTransient ? 503 : 500).json({
+      error: isTransient 
+        ? "The motion choreographer is currently busy. Please try again shortly." 
+        : (error.message || "Failed to synthesize SVG animation"),
+      isTransient,
     });
   }
 });

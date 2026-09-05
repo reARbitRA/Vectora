@@ -14,7 +14,9 @@ import {
   Layout,
   Maximize2,
   Scan,
-  Download
+  Download,
+  Film,
+  Sparkles
 } from 'lucide-react';
 
 interface StudioCanvasProps {
@@ -27,6 +29,7 @@ interface StudioCanvasProps {
   showLayers?: boolean;
   onOpenExport?: () => void;
   onOpenImport?: () => void;
+  onOpenAnimator?: () => void;
   onUpdateSettings: (newSettings: Partial<CanvasSettings>) => void;
   onUndo?: () => void;
   onRedo?: () => void;
@@ -44,6 +47,7 @@ export const StudioCanvas: React.FC<StudioCanvasProps> = ({
   showLayers = false,
   onOpenExport,
   onOpenImport,
+  onOpenAnimator,
   onUpdateSettings,
   onUndo,
   onRedo,
@@ -514,11 +518,33 @@ export const StudioCanvas: React.FC<StudioCanvasProps> = ({
             </button>
           ))}
         </div>
+
+        {/* Quick Animate Button */}
+        {onOpenAnimator && (
+          <button
+            onClick={onOpenAnimator}
+            title="Open SVG Kinetic Animation Studio"
+            className="bg-[#0A0A0A] px-2.5 py-1.5 border border-[#333333] hover:border-[#00FF00] text-[#00FF00] text-xs font-mono uppercase flex items-center gap-1.5 transition-all shadow-md"
+          >
+            <Film className="w-3.5 h-3.5" />
+            <span className="font-bold">Animate SVG</span>
+          </button>
+        )}
       </div>
 
       {/* Canvas Focus Floating Top-Right HUD */}
       {workspaceLayout === 'canvas-focus' && (
         <div className="absolute top-4 right-4 z-20 flex items-center gap-2 font-mono">
+          {onOpenAnimator && (
+            <button
+              onClick={onOpenAnimator}
+              title="Open Kinetic Animation Studio"
+              className="px-2.5 py-1.5 bg-[#0A0A0A]/90 border border-[#333333] hover:border-[#00FF00] text-[#00FF00] text-xs font-mono uppercase flex items-center gap-1.5 backdrop-blur-md transition-all font-bold"
+            >
+              <Film className="w-3.5 h-3.5" />
+              <span>Animate</span>
+            </button>
+          )}
           {onToggleLayers && (
             <button
               onClick={onToggleLayers}

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { ExportPreset, VectorArtwork } from '../types';
 import {
   downloadBlob,
@@ -6,6 +6,11 @@ import {
   svgToReactComponent,
   formatSvgXml
 } from '../utils/svgParser';
+import {
+  generateSvgSpriteSheet,
+  renderPngSpriteSheet,
+  SpriteSheetOptions
+} from '../utils/spriteSheetRenderer';
 import {
   Download,
   Copy,
@@ -21,7 +26,11 @@ import {
   Plus,
   Trash2,
   Sliders,
-  CheckCircle2
+  CheckCircle2,
+  Grid,
+  Play,
+  Pause,
+  Layers
 } from 'lucide-react';
 
 interface ExportModalProps {
@@ -30,7 +39,7 @@ interface ExportModalProps {
   artwork: VectorArtwork;
 }
 
-type ExportTab = 'svg' | 'png' | 'react' | 'datauri';
+type ExportTab = 'svg' | 'png' | 'react' | 'datauri' | 'spritesheet';
 
 const DEFAULT_PRESETS: ExportPreset[] = [
   {
@@ -38,6 +47,12 @@ const DEFAULT_PRESETS: ExportPreset[] = [
     name: 'SVG Source',
     description: 'Raw, resolution-independent SVG with layer groups & semantic markup',
     tab: 'svg',
+  },
+  {
+    id: 'preset-spritesheet',
+    name: 'SVG Sprite Sheet',
+    description: 'Multi-frame sequential animation grid, optimized for games & CSS step animation',
+    tab: 'spritesheet',
   },
   {
     id: 'preset-web-social',
@@ -107,6 +122,73 @@ export const ExportModal: React.FC<ExportModalProps> = ({
   const [newPresetName, setNewPresetName] = useState('');
   const [newPresetDesc, setNewPresetDesc] = useState('');
   const [saveSuccessMsg, setSaveSuccessMsg] = useState('');
+
+  // Sprite Sheet Options & State
+  const [spriteCols, setSpriteCols] = useState<number>(4);
+  const [spriteRows, setSpriteRows] = useState<number>(4);
+  const [spriteFrameSize, setSpriteFrameSize] = useState<number>(256);
+  const [spriteDuration, setSpriteDuration] = useState<number>(4);
+  const [spriteBg, setSpriteBg] = useState<string>('#0A0A0A');
+  const [isExportingSpritePng, setIsExportingSpritePng] = useState(false);
+  const [spriteProgress, setSpriteProgress] = useState<number>(0);
+  const [activePreviewFrame, setActivePreviewFrame] = useState<number>(0);
+  const [isPlayingSpritePreview, setIsPlayingSpritePreview] = useState<boolean>(true);
+
+  // Compute SVG Sprite Sheet
+  const spriteSheetResult = useMemo(() => {
+    return generateSvgSpriteSheet(artwork.svg, {
+      cols: spriteCols,
+      rows: spriteRows,
+      frameWidth: spriteFrameSize,
+      frameHeight: spriteFrameSize,
+      duration: spriteDuration,
+      backgroundColor: spriteBg,
+    });
+  }, [artwork.svg, spriteCols, spriteRows, spriteFrameSize, spriteDuration, spriteBg]);
+
+  // Sprite preview interval loop
+  useEffect(() => {
+    if (!isPlayingSpritePreview || tab !== 'spritesheet') return;
+    const totalFrames = spriteCols * spriteRows;
+    const intervalMs = (spriteDuration * 1000) / totalFrames;
+
+    const timer = setInterval(() => {
+      setActivePreviewFrame((prev) => (prev + 1) % totalFrames);
+    }, Math.max(30, intervalMs));
+
+    return () => clearInterval(timer);
+  }, [isPlayingSpritePreview, tab, spriteCols, spriteRows, spriteDuration]);
+
+  // Download SVG Sprite Sheet
+  const handleDownloadSvgSpriteSheet = () => {
+    const blob = new Blob([spriteSheetResult.svgSpriteSheet], { type: 'image/svg+xml;charset=utf-8' });
+    const filename = `${artwork.title.toLowerCase().replace(/\s+/g, '-')}-spritesheet-${spriteCols}x${spriteRows}.svg`;
+    downloadBlob(blob, filename);
+  };
+
+  // Download PNG Sprite Sheet
+  const handleDownloadPngSpriteSheet = async () => {
+    try {
+      setIsExportingSpritePng(true);
+      setSpriteProgress(5);
+      const blob = await renderPngSpriteSheet(artwork.svg, {
+        cols: spriteCols,
+        rows: spriteRows,
+        frameWidth: spriteFrameSize,
+        frameHeight: spriteFrameSize,
+        duration: spriteDuration,
+        backgroundColor: spriteBg,
+        onProgress: (p) => setSpriteProgress(p),
+      });
+      const filename = `${artwork.title.toLowerCase().replace(/\s+/g, '-')}-spritesheet-${spriteCols}x${spriteRows}.png`;
+      downloadBlob(blob, filename);
+    } catch (err) {
+      console.error('Failed to export PNG Sprite Sheet:', err);
+    } finally {
+      setIsExportingSpritePng(false);
+      setSpriteProgress(0);
+    }
+  };
 
   // Persist custom presets to localStorage whenever presets change
   useEffect(() => {
@@ -333,6 +415,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
         <div className="flex border-b border-[#333333] bg-[#000000] px-4 pt-2 gap-1 overflow-x-auto">
           {[
             { id: 'svg', label: 'SVG File', icon: FileCode },
+            { id: 'spritesheet', label: 'Sprite Sheet', icon: Grid },
             { id: 'png', label: 'PNG Raster (HD)', icon: ImageIcon },
             { id: 'react', label: 'React TSX', icon: Code2 },
             { id: 'datauri', label: 'CSS Data URI', icon: FileText },
@@ -345,7 +428,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
                   setTab(t.id as ExportTab);
                   setCopied(false);
                 }}
-                className={`flex items-center gap-2 px-3 py-2 text-xs font-mono font-bold uppercase transition-all border-b-2 ${
+                className={`flex items-center gap-2 px-3 py-2 text-xs font-mono font-bold uppercase transition-all border-b-2 whitespace-nowrap ${
                   tab === t.id
                     ? 'border-[#00FF00] text-[#00FF00] bg-[#141414]'
                     : 'border-transparent text-[#888888] hover:text-[#FFFFFF]'
@@ -388,6 +471,212 @@ export const ExportModal: React.FC<ExportModalProps> = ({
                 >
                   <Download className="w-4 h-4" />
                   <span>Download .svg</span>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {tab === 'spritesheet' && (
+            <div className="space-y-4">
+              <div className="p-3 bg-[#141414] border border-[#00FF00]/30 text-xs text-[#CCCCCC] leading-relaxed font-mono flex items-start gap-2.5">
+                <Grid className="w-4 h-4 text-[#00FF00] shrink-0 mt-0.5" />
+                <div>
+                  <span className="font-bold text-[#00FF00] uppercase">Vector Animation Sprite Sheet:</span> Combines temporal animation keyframe snapshots into a single high-performance grid layout. Ideal for 60fps CSS step animations, web games, Pixi.js, Phaser, and low-overhead UI icons.
+                </div>
+              </div>
+
+              {/* Sprite Grid Settings */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-[#111111] p-3.5 border border-[#333333]">
+                {/* Layout Grid */}
+                <div>
+                  <label className="text-[11px] font-bold text-[#FFFFFF] uppercase tracking-wider block mb-1.5 font-mono">
+                    Grid Configuration
+                  </label>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {[
+                      { cols: 4, rows: 4, label: '4x4 (16 Frames)' },
+                      { cols: 3, rows: 3, label: '3x3 (9 Frames)' },
+                      { cols: 6, rows: 2, label: '6x2 (12 Frames)' },
+                      { cols: 8, rows: 1, label: '8x1 (8 Strip)' },
+                    ].map((g) => (
+                      <button
+                        key={`${g.cols}x${g.rows}`}
+                        onClick={() => {
+                          setSpriteCols(g.cols);
+                          setSpriteRows(g.rows);
+                          setActivePreviewFrame(0);
+                        }}
+                        className={`px-2 py-1.5 text-left border text-[11px] font-mono transition-colors ${
+                          spriteCols === g.cols && spriteRows === g.rows
+                            ? 'bg-[#00FF00]/15 text-[#00FF00] border-[#00FF00]'
+                            : 'bg-[#1A1A1A] text-[#888888] border-[#333333] hover:text-[#FFFFFF]'
+                        }`}
+                      >
+                        {g.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Resolution per Frame */}
+                <div>
+                  <label className="text-[11px] font-bold text-[#FFFFFF] uppercase tracking-wider block mb-1.5 font-mono">
+                    Frame Resolution
+                  </label>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {[
+                      { size: 128, label: '128px' },
+                      { size: 256, label: '256px' },
+                      { size: 512, label: '512px' },
+                    ].map((s) => (
+                      <button
+                        key={s.size}
+                        onClick={() => setSpriteFrameSize(s.size)}
+                        className={`px-2 py-1.5 text-center border text-[11px] font-mono transition-colors ${
+                          spriteFrameSize === s.size
+                            ? 'bg-[#00FF00]/15 text-[#00FF00] border-[#00FF00]'
+                            : 'bg-[#1A1A1A] text-[#888888] border-[#333333] hover:text-[#FFFFFF]'
+                        }`}
+                      >
+                        {s.label}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="text-[10px] text-[#666666] mt-1 font-mono">
+                    Total: {spriteCols * spriteFrameSize}x{spriteRows * spriteFrameSize}px
+                  </div>
+                </div>
+
+                {/* Background & Timing */}
+                <div>
+                  <label className="text-[11px] font-bold text-[#FFFFFF] uppercase tracking-wider block mb-1.5 font-mono">
+                    Background Style
+                  </label>
+                  <div className="flex gap-1.5">
+                    {[
+                      { bg: '#0A0A0A', label: 'Dark Canvas' },
+                      { bg: 'transparent', label: 'Transparent' },
+                      { bg: '#FFFFFF', label: 'Pure White' },
+                    ].map((b) => (
+                      <button
+                        key={b.bg}
+                        onClick={() => setSpriteBg(b.bg)}
+                        className={`flex-1 px-1.5 py-1.5 text-center border text-[10px] font-mono transition-colors truncate ${
+                          spriteBg === b.bg
+                            ? 'bg-[#00FF00]/15 text-[#00FF00] border-[#00FF00]'
+                            : 'bg-[#1A1A1A] text-[#888888] border-[#333333] hover:text-[#FFFFFF]'
+                        }`}
+                      >
+                        {b.label}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="mt-2 flex items-center justify-between text-[11px] text-[#888888] font-mono">
+                    <span>Cycle Duration:</span>
+                    <span className="text-[#00FF00] font-bold">{spriteDuration}s</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Interactive Frame Navigator & Live Stepped Preview */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 bg-[#0A0A0A] p-3 border border-[#222222]">
+                {/* Live Playback Cell */}
+                <div className="flex flex-col items-center justify-center p-3 bg-[#141414] border border-[#333333] relative">
+                  <div className="w-full flex items-center justify-between mb-2">
+                    <span className="text-[10px] font-bold text-[#888888] uppercase tracking-wider font-mono">
+                      Real-time Step Preview
+                    </span>
+                    <button
+                      onClick={() => setIsPlayingSpritePreview(!isPlayingSpritePreview)}
+                      className="flex items-center gap-1 text-[10px] text-[#00FF00] hover:text-[#33FF33] font-mono font-bold uppercase"
+                    >
+                      {isPlayingSpritePreview ? <Pause className="w-3 h-3" /> : <Play className="w-3 h-3" />}
+                      <span>{isPlayingSpritePreview ? 'Pause' : 'Play'}</span>
+                    </button>
+                  </div>
+
+                  <div className="w-40 h-40 border border-[#333333] flex items-center justify-center relative overflow-hidden bg-[#000000]">
+                    <div
+                      className="w-full h-full flex items-center justify-center pointer-events-none"
+                      style={{
+                        transform: `scale(${160 / spriteFrameSize})`,
+                        transformOrigin: 'center center',
+                      }}
+                      dangerouslySetInnerHTML={{
+                        __html: spriteSheetResult.frames[activePreviewFrame]?.svgContent || artwork.svg,
+                      }}
+                    />
+                  </div>
+
+                  <div className="mt-2 text-[10px] font-mono text-[#888888] flex items-center gap-2">
+                    <span>Frame: <strong className="text-[#00FF00]">{activePreviewFrame + 1} / {spriteSheetResult.frames.length}</strong></span>
+                    <span>&middot;</span>
+                    <span>Delay: <strong className="text-[#FFFFFF]">{(activePreviewFrame * (spriteDuration / spriteSheetResult.frames.length)).toFixed(2)}s</strong></span>
+                  </div>
+                </div>
+
+                {/* CSS Animation Stepper Code */}
+                <div className="flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-[10px] font-bold text-[#888888] uppercase tracking-wider font-mono">
+                        CSS Steps Animation Snippet
+                      </span>
+                      <button
+                        onClick={() => handleCopy(spriteSheetResult.cssSample)}
+                        className="text-[10px] text-[#00FF00] hover:underline font-mono font-bold uppercase flex items-center gap-1"
+                      >
+                        {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                        <span>{copied ? 'Copied' : 'Copy CSS'}</span>
+                      </button>
+                    </div>
+                    <textarea
+                      readOnly
+                      value={spriteSheetResult.cssSample}
+                      className="w-full h-28 bg-[#000000] border border-[#333333] p-2 font-mono text-[10px] text-[#00FF00] resize-none focus:outline-none custom-scrollbar select-all"
+                    />
+                  </div>
+
+                  <div className="text-[10px] text-[#666666] font-mono leading-tight mt-2">
+                    Tip: Use the CSS snippet with your exported Sprite Sheet PNG/SVG to animate with zero JavaScript overhead.
+                  </div>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex flex-wrap items-center justify-end gap-2 pt-2">
+                <button
+                  onClick={() => handleCopy(spriteSheetResult.svgSpriteSheet)}
+                  className="flex items-center gap-1.5 px-3 py-2 bg-[#141414] hover:bg-[#222222] text-[#FFFFFF] border border-[#333333] text-xs font-bold uppercase transition-colors"
+                >
+                  {copied ? <Check className="w-3.5 h-3.5 text-[#00FF00]" /> : <Copy className="w-3.5 h-3.5" />}
+                  <span>{copied ? 'Copied' : 'Copy Sprite SVG'}</span>
+                </button>
+
+                <button
+                  onClick={handleDownloadSvgSpriteSheet}
+                  className="flex items-center gap-1.5 px-4 py-2 bg-[#141414] hover:bg-[#222222] text-[#00FF00] border border-[#00FF00]/40 text-xs font-bold uppercase tracking-wider transition-colors"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Download SVG Sprite Sheet</span>
+                </button>
+
+                <button
+                  onClick={handleDownloadPngSpriteSheet}
+                  disabled={isExportingSpritePng}
+                  className="flex items-center gap-1.5 px-5 py-2 bg-[#00FF00] hover:bg-[#33FF33] text-[#000000] font-bold text-xs uppercase tracking-wider transition-colors disabled:opacity-50"
+                >
+                  {isExportingSpritePng ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin text-[#000000]" />
+                      <span>Rendering Sprite ({spriteProgress}%)...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Download className="w-4 h-4" />
+                      <span>Download PNG Sprite Sheet</span>
+                    </>
+                  )}
                 </button>
               </div>
             </div>

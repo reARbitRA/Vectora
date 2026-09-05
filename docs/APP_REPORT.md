@@ -1,7 +1,7 @@
 # VECTORA STUDIO — COMPREHENSIVE TECHNICAL ARCHITECTURE & SYSTEM REPORT
 
 > **Application Name:** VECTORA Studio  
-> **Version:** 2.5.0 Production Ready  
+> **Version:** 2.6.0 Production Ready  
 > **Classification:** Generative Vector Graphics Engine & Vector Design Studio  
 > **Runtime Environment:** React 18+ (SPA) · Vite · Express Backend · Node.js · TypeScript · Tailwind CSS  
 > **AI Architecture:** Multi-modal Gemini 2.5/3 Flash Vision & Structural Reasoning Engine (`@google/genai`)  
@@ -87,9 +87,37 @@ The platform provides a bridge between **computational generative AI** and **pro
   - **4K Display**: 4x (4000px) UHD wallpaper.
 - **Custom Preset Manager**: Save, load, and delete custom resolution profiles persisted in local storage (`vectora_export_presets`).
 
-### 2.9. Reusable Component & Pattern Library
+### 2.9. SVG Kinetic Animation Engine (Static-to-Animated Transformation)
+- **Zero-Dependency Standalone Motion**: Compiles motion parameters directly into pure, GPU-accelerated CSS3 `@keyframes` and targeted class bindings embedded inside the SVG's `<style id="vectora-animations">` block. The resulting SVG files animate natively in any browser, Figma, Android/iOS vector drawables, or HTML `<img>` tags without requiring any external JavaScript runtime.
+- **10 Curated Motion Presets**:
+  - **Smart Orchestration (`orchestrated-composite`)**: Multi-layer choreographed symphony where backgrounds pulse, frames rotate, core contours draw, and accents flicker.
+  - **Laser Path Trace (`path-draw`)**: Hypnotic stroke-dashoffset drawing animation across all vector contours and bezier paths.
+  - **Orbital Spin (`orbit-spin`)**: Smooth 360° celestial rotation around optical centroids with alternating directional velocity.
+  - **Breathing Pulse (`pulse-breath`)**: Rhythmic harmonic scale oscillation and specular drop-shadow glow.
+  - **Radar & Scanline Sweep (`radar-sweep`)**: Sci-Fi telemetry angle beam sweeping across reticles, dials, and coordinate markers.
+  - **Cinematic Hover (`float-hover`)**: Weightless zero-gravity levitation with vertical displacement and subtle angular tilt.
+  - **Glitch Matrix Surge (`glitch-surge`)**: High-frequency cybernetic phase shift, chromatic shear, and lightning-fast stroboscopic displacement.
+  - **Color Spectrum Wave (`color-shimmer`)**: 360-degree continuous hue-shift and saturation wave sweeping across gradients and strokes.
+  - **Neon Strobe & Flicker (`neon-flicker`)**: Authentic gas-discharge neon sign electrical ignition flicker with intermittent flares.
+  - **Morphing Oscillation (`wave-oscillate`)**: Harmonic sine wave scale and shear elasticity for organic vector dynamics.
+- **Granular Layer-by-Layer Choreography**: Interactive timeline allowing users to assign bespoke animation behaviors, durations, delays, and intensities to individual Inkscape layer groups.
+- **AI Smart Motion Synthesis**: Server-side `/api/animate-svg` route providing contextual kinetic choreography tailored specifically to the semantic subject matter.
+- **Parametric Motion Studio**: Interactive controls for playback speed (0.25x - 4x), cycle duration (1s - 24s), easing curves (`linear`, `ease-in-out`, `cubic-bezier`, `steps`), cycle directions (`normal`, `reverse`, `alternate`), and play/pause controls.
+- **Export & Code Generation**: One-click standalone animated SVG export and typed React TSX component generation.
+- **Animation Sync & Phase Locking**: Advanced relationship mapping engine for linking multiple layers to identical timing parameters, shared easing functions, and synchronized durations.
+- **Render as GIF Engine**: High-fidelity browser-side capturing system utilizing `gif.js` to encode the 60FPS CSS animation timeline into standalone, loopable GIF assets.
+- **Global Animation Loop Settings**: Granular control over playback cycles including *Infinite Loop*, *Single Playback*, and *Alternate (Ping-Pong)* modes.
+- **Integrated Motion Blur**: Parametric motion trail synthesizer that generates staggered path clones with opacity decay directly in the SVG structure.
+- **Visual Keyframe Timeline**: Interactive timeline bar with draggable nodes for real-time duration and speed adjustments.
+
+### 2.10. Reusable Component & Pattern Library
 - Library of pre-built vector primitives (Cyberpunk HUD Reticles, Sacred Geometry Mandalas, Circuit Traces, Bauhaus Isometric Cubes, Radial Gauges).
 - One-click insertion into the current active artwork via `<defs>` and `<use>` injection.
+
+### 2.11. Robust AI Reliability & Error Handling
+- **Exponential Backoff Engine**: Server-side AI requests are protected by a smart retry utility (`withRetry`) that handles 503 "High Demand" errors with jittered backoff logic.
+- **Client-Side Notification System**: Global toast-style reporting for AI statuses, background successes, and technical error diagnostics with clear human-readable guidance.
+- **Graceful Procedural Fallback**: Intelligent fallback mechanisms that utilize mathematical synthesis when the AI backend is temporarily unavailable, ensuring zero downtime for user creativity.
 
 ---
 
