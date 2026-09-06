@@ -1,29 +1,51 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { IntroLoader } from './components/IntroLoader';
 import { MainLayout } from './components/MainLayout';
 import { HomeView } from './components/HomeView';
 import { UnifiedStudio } from './components/UnifiedStudio';
 import { MasterpieceGallery } from './components/MasterpieceGallery';
+import { HistoryView } from './components/HistoryView';
 import { GenerationLoader } from './components/GenerationLoader';
 import { CommandPalette } from './components/CommandPalette';
 import { KeyboardShortcutsModal } from './components/KeyboardShortcutsModal';
 import { Toaster, toast } from 'sonner';
 import { downloadBlob, exportSvgToPng } from './utils/svgParser';
+import { MASTERPIECES } from './data/masterpieces';
 import { Keyboard, Command } from 'lucide-react';
 
 export default function App() {
-  const [showIntro, setShowIntro] = useState(true);
-  const [activeView, setActiveView] = useState<'home' | 'studio' | 'gallery'>('home');
+  const [showIntro, setShowIntro] = useState(false);
+  const [activeView, setActiveView] = useState<'home' | 'studio' | 'gallery' | 'history'>('studio');
   const [isSidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [currentPrompt, setCurrentPrompt] = useState('');
-  const [currentArtwork, setCurrentArtwork] = useState<any>(null);
+  const [currentArtwork, setCurrentArtwork] = useState<any>(MASTERPIECES[0]);
   const [showCommandPalette, setShowCommandPalette] = useState(false);
   const [showShortcutsModal, setShowShortcutsModal] = useState(false);
 
+  const saveToHistory = useCallback((artwork: any) => {
+    if (!artwork || !artwork.id) return;
+    try {
+      const stored = localStorage.getItem('vectora_history');
+      const list = stored ? JSON.parse(stored) : [];
+      const filtered = list.filter((item: any) => item.id !== artwork.id);
+      const updated = [artwork, ...filtered].slice(0, 30);
+      localStorage.setItem('vectora_history', JSON.stringify(updated));
+    } catch (e) {
+      console.warn('Could not persist history', e);
+    }
+  }, []);
+
+  // Seed initial artwork in history if not already present
+  useEffect(() => {
+    if (MASTERPIECES[0]) {
+      saveToHistory(MASTERPIECES[0]);
+    }
+  }, [saveToHistory]);
+
   // Global SVG Download Action
-  const handleDownloadCurrentSvg = () => {
+  const handleDownloadCurrentSvg = useCallback(() => {
     if (!currentArtwork?.svg) {
       toast.info('No active artwork to export');
       return;
@@ -36,7 +58,7 @@ export default function App() {
     } catch (err: any) {
       toast.error('Download failed', { description: err.message });
     }
-  };
+  }, [currentArtwork]);
 
   // Global High-Res PNG Download Action
   const handleDownloadCurrentPng = async (scale = 2) => {
@@ -54,7 +76,10 @@ export default function App() {
       toast.success('High-Res PNG Exported', { id: toastId, description: filename });
     } catch (err: any) {
       console.error('PNG export failed:', err);
-      toast.error('Rasterization failed', { id: toastId, description: err.message });
+      toast.error('Rasterization failed', {
+        id: toastId,
+        description: err?.message || 'Unable to render vector canvas to PNG.'
+      });
     }
   };
 
@@ -105,6 +130,12 @@ export default function App() {
         toast.info('Workspace: Masterpiece Gallery', { description: 'Shortcut: Ctrl+3' });
         return;
       }
+      if (isCmdOrCtrl && e.key === '4') {
+        e.preventDefault();
+        setActiveView('history');
+        toast.info('Workspace: Design History', { description: 'Shortcut: Ctrl+4' });
+        return;
+      }
 
       // Trigger New Artwork / Focus Prompt (Ctrl+N)
       if (isCmdOrCtrl && e.key.toLowerCase() === 'n') {
@@ -153,10 +184,6 @@ export default function App() {
     });
 
     try {
-      const formData = new FormData();
-      formData.append('type', file ? 'vision' : 'text');
-      formData.append('prompt', prompt);
-      
       let base64Image = '';
       if (file) {
         base64Image = await new Promise((resolve) => {
@@ -166,54 +193,83 @@ export default function App() {
         });
       }
 
-      const response = await fetch('/api/generate-unified', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          prompt,
-          image: base64Image,
-          type: file ? 'vision' : 'text'
-        }),
-      });
+      let response: Response;
+      try {
+        response = await fetch('/api/generate-unified', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            prompt,
+            image: base64Image,
+            type: file ? 'vision' : 'text'
+          }),
+        });
+      } catch (networkErr: any) {
+        // Fallback for text prompt if generate-unified network stream broke
+        if (!file) {
+          response = await fetch('/api/generate-svg', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ prompt }),
+          });
+        } else {
+          throw new Error(networkErr?.message || 'Network connection interrupted. Please try again.');
+        }
+      }
 
       if (response.status === 429) {
         toast.error('Engine Cooling Down', {
           id: toastId,
-          description: 'Free tier quota reached. Retrying in background (30s delay)...'
+          description: 'Free tier quota reached. Retrying with fallback model...'
         });
       }
 
-      if (!response.ok) throw new Error('Generation failed');
+      if (!response.ok) {
+        let errorDetail = 'Generation failed';
+        try {
+          const errJson = await response.json();
+          if (errJson?.error) errorDetail = errJson.error;
+        } catch (_) {
+          errorDetail = `Server returned status ${response.status}`;
+        }
+        throw new Error(errorDetail);
+      }
 
       const result = await response.json();
       if (result.success && result.data) {
         setCurrentArtwork(result.data);
+        saveToHistory(result.data);
         setActiveView('studio');
         toast.success('Masterpiece Synthesized', { id: toastId });
       } else {
-        throw new Error(result.error || 'Invalid response from AI');
+        throw new Error(result.error || 'Invalid response received from synthesis engine.');
       }
     } catch (error: any) {
       console.error('Error generating artwork:', error);
       toast.error('Synthesis Failed', {
         id: toastId,
-        description: error.message || 'The AI swarm is currently overloaded.'
+        description: error.message || 'The AI swarm is currently overloaded. Please try again.'
       });
     } finally {
       setIsGenerating(false);
     }
   };
 
-  const handleUpdateSvg = (newSvg: string) => {
-    if (currentArtwork) {
-      setCurrentArtwork({ ...currentArtwork, svg: newSvg });
-    }
-  };
+  const handleUpdateSvg = useCallback((newSvg: string) => {
+    setCurrentArtwork((prev: any) => {
+      if (!prev) return prev;
+      if (prev.svg === newSvg) return prev;
+      const updated = { ...prev, svg: newSvg };
+      saveToHistory(updated);
+      return updated;
+    });
+  }, [saveToHistory]);
 
-  const handleUpdateArtwork = (newArtwork: any) => {
+  const handleUpdateArtwork = useCallback((newArtwork: any) => {
     setCurrentArtwork(newArtwork);
+    saveToHistory(newArtwork);
     setActiveView('studio');
-  };
+  }, [saveToHistory]);
 
   if (showIntro) {
     return <IntroLoader onComplete={() => setShowIntro(false)} />;
@@ -231,6 +287,9 @@ export default function App() {
         onViewChange={setActiveView}
         isSidebarCollapsed={isSidebarCollapsed}
         setSidebarCollapsed={setSidebarCollapsed}
+        artworkTitle={currentArtwork?.title}
+        onOpenShortcuts={() => setShowShortcutsModal(true)}
+        onOpenCommandPalette={() => setShowCommandPalette(true)}
       >
         <AnimatePresence mode="wait">
           {activeView === 'home' && (
@@ -241,7 +300,11 @@ export default function App() {
               exit={{ opacity: 0, x: -20 }}
               className="h-full"
             >
-              <HomeView onGenerate={handleGenerate} isGenerating={isGenerating} />
+              <HomeView 
+                onGenerate={handleGenerate} 
+                isGenerating={isGenerating} 
+                onGoToStudio={() => setActiveView('studio')}
+              />
             </motion.div>
           )}
 
@@ -286,8 +349,28 @@ export default function App() {
                 currentArtworkId={currentArtwork?.id || ''}
                 onSelectArtwork={(art) => {
                   setCurrentArtwork(art);
+                  saveToHistory(art);
                   setActiveView('studio');
                 }} 
+              />
+            </motion.div>
+          )}
+
+          {activeView === 'history' && (
+            <motion.div
+              key="history"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 20 }}
+              className="h-full"
+            >
+              <HistoryView 
+                currentArtworkId={currentArtwork?.id || ''}
+                onSelectArtwork={(art) => {
+                  setCurrentArtwork(art);
+                  setActiveView('studio');
+                }}
+                onNewDesign={() => setActiveView('home')}
               />
             </motion.div>
           )}

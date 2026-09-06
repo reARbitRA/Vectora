@@ -827,51 +827,168 @@ export default ${componentName};
 `;
 }
 
+/**
+ * Sanitizes and normalizes SVG markup for robust canvas rasterization.
+ * Ensures namespaces, explicit viewBox, dimensions, and XML validity.
+ */
+export function sanitizeSvgForRasterization(svgString: string): {
+  cleanSvg: string;
+  width: number;
+  height: number;
+} {
+  if (!svgString || typeof svgString !== 'string') {
+    throw new Error('Invalid SVG markup provided for rasterization');
+  }
+
+  let width = 1000;
+  let height = 1000;
+
+  try {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(svgString, 'image/svg+xml');
+    const parserError = doc.querySelector('parsererror');
+    const svgEl = doc.querySelector('svg');
+
+    if (!svgEl || parserError) {
+      // Fallback regex detection if DOMParser failed on unusual syntax
+      const viewBoxMatch = svgString.match(/viewBox=["']\s*([0-9.-]+)\s+([0-9.-]+)\s+([0-9.-]+)\s+([0-9.-]+)\s*["']/i);
+      const widthMatch = svgString.match(/width=["']\s*([0-9.]+)(?:px)?\s*["']/i);
+      const heightMatch = svgString.match(/height=["']\s*([0-9.]+)(?:px)?\s*["']/i);
+
+      if (viewBoxMatch) {
+        width = parseFloat(viewBoxMatch[3]) || 1000;
+        height = parseFloat(viewBoxMatch[4]) || 1000;
+      } else if (widthMatch && heightMatch) {
+        width = parseFloat(widthMatch[1]) || 1000;
+        height = parseFloat(heightMatch[1]) || 1000;
+      }
+
+      let fixed = svgString;
+      if (!fixed.includes('xmlns=')) {
+        fixed = fixed.replace(/<svg/i, '<svg xmlns="http://www.w3.org/2000/svg"');
+      }
+      return { cleanSvg: fixed, width, height };
+    }
+
+    // Ensure standard SVG XML namespaces are set
+    if (!svgEl.getAttribute('xmlns')) {
+      svgEl.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+    }
+    if (!svgEl.getAttribute('xmlns:xlink')) {
+      svgEl.setAttribute('xmlns:xlink', 'http://www.w3.org/1999/xlink');
+    }
+
+    // Resolve explicit dimensions
+    const viewBox = svgEl.getAttribute('viewBox');
+    const wAttr = svgEl.getAttribute('width');
+    const hAttr = svgEl.getAttribute('height');
+
+    if (viewBox) {
+      const parts = viewBox.trim().split(/[\s,]+/).map(Number);
+      if (parts.length === 4 && parts[2] > 0 && parts[3] > 0) {
+        width = parts[2];
+        height = parts[3];
+      }
+    } else if (wAttr && hAttr) {
+      const parsedW = parseFloat(wAttr);
+      const parsedH = parseFloat(hAttr);
+      if (!isNaN(parsedW) && parsedW > 0) width = parsedW;
+      if (!isNaN(parsedH) && parsedH > 0) height = parsedH;
+    }
+
+    // Force explicit attributes so img loader measures exact layout
+    svgEl.setAttribute('width', `${width}`);
+    svgEl.setAttribute('height', `${height}`);
+    if (!viewBox) {
+      svgEl.setAttribute('viewBox', `0 0 ${width} ${height}`);
+    }
+
+    const cleanSvg = new XMLSerializer().serializeToString(doc);
+    return { cleanSvg, width, height };
+  } catch {
+    return { cleanSvg: svgString, width: 1000, height: 1000 };
+  }
+}
+
 // Rasterize SVG to PNG Blob at specific resolution (1x = 1000px, 2x = 2000px, 4x = 4000px, etc.)
 export async function exportSvgToPng(svgString: string, scale = 2): Promise<Blob> {
-  return new Promise((resolve, reject) => {
+  const { cleanSvg, width: baseW, height: baseH } = sanitizeSvgForRasterization(svgString);
+  const targetScale = Math.max(0.25, Math.min(scale || 2, 8));
+  const targetWidth = Math.max(16, Math.round(baseW * targetScale));
+  const targetHeight = Math.max(16, Math.round(baseH * targetScale));
+
+  const loadSvgImage = async (): Promise<HTMLImageElement> => {
+    // Strategy 1: Data URI with Base64 encoding (most reliable in iframes & sandbox)
     try {
-      const blob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
-      const blobURL = window.URL.createObjectURL(blob);
-      const img = new Image();
-
-      img.onload = () => {
-        const width = (img.naturalWidth || 1000) * scale;
-        const height = (img.naturalHeight || 1000) * scale;
-
-        const canvas = document.createElement('canvas');
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext('2d');
-        if (!ctx) {
-          window.URL.revokeObjectURL(blobURL);
-          reject(new Error('Canvas context could not be created'));
-          return;
+      const b64 = btoa(unescape(encodeURIComponent(cleanSvg)));
+      const dataUri = `data:image/svg+xml;base64,${b64}`;
+      return await createImageFromSrc(dataUri);
+    } catch {
+      // Strategy 2: URL encoded Data URI
+      try {
+        const utf8DataUri = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(cleanSvg)}`;
+        return await createImageFromSrc(utf8DataUri);
+      } catch {
+        // Strategy 3: Object Blob URL
+        const blob = new Blob([cleanSvg], { type: 'image/svg+xml;charset=utf-8' });
+        const blobUrl = URL.createObjectURL(blob);
+        try {
+          const img = await createImageFromSrc(blobUrl);
+          URL.revokeObjectURL(blobUrl);
+          return img;
+        } catch {
+          URL.revokeObjectURL(blobUrl);
+          throw new Error('Vector rasterization failed: browser image engine rejected SVG markup.');
         }
-
-        ctx.imageSmoothingEnabled = true;
-        ctx.imageSmoothingQuality = 'high';
-        ctx.drawImage(img, 0, 0, width, height);
-
-        canvas.toBlob((pngBlob) => {
-          window.URL.revokeObjectURL(blobURL);
-          if (pngBlob) {
-            resolve(pngBlob);
-          } else {
-            reject(new Error('PNG conversion failed'));
-          }
-        }, 'image/png');
-      };
-
-      img.onerror = (e) => {
-        window.URL.revokeObjectURL(blobURL);
-        reject(e);
-      };
-
-      img.src = blobURL;
-    } catch (err) {
-      reject(err);
+      }
     }
+  };
+
+  const img = await loadSvgImage();
+
+  const canvas = document.createElement('canvas');
+  canvas.width = targetWidth;
+  canvas.height = targetHeight;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) {
+    throw new Error('Canvas 2D rendering context could not be initialized');
+  }
+
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
+
+  return new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob((blob) => {
+      if (blob) {
+        resolve(blob);
+      } else {
+        try {
+          const dataUrl = canvas.toDataURL('image/png');
+          const byteString = atob(dataUrl.split(',')[1]);
+          const ab = new ArrayBuffer(byteString.length);
+          const ia = new Uint8Array(ab);
+          for (let i = 0; i < byteString.length; i++) {
+            ia[i] = byteString.charCodeAt(i);
+          }
+          resolve(new Blob([ab], { type: 'image/png' }));
+        } catch {
+          reject(new Error('Canvas PNG export failed during pixel buffer serialization'));
+        }
+      }
+    }, 'image/png');
+  });
+}
+
+function createImageFromSrc(src: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => resolve(img);
+    img.onerror = () => {
+      reject(new Error('Failed to load SVG source into raster image element'));
+    };
+    img.src = src;
   });
 }
 

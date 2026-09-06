@@ -8,7 +8,7 @@ import crypto from "crypto";
 dotenv.config();
 
 const app = express();
-const PORT = parseInt(process.env.PORT || "3000", 10);
+const PORT = 3000;
 
 app.use(express.json({ limit: "50mb" }));
 
@@ -115,41 +115,18 @@ function createModelRegistry(): Map<string, ModelProfile> {
     });
   };
 
-  // ── Tier 1: Flagship Deep Reasoning ──────────────────────────────────────
-  define("gemini-3-pro-deep-think",   1, ["text", "vision", "thinking", "deep-think", "code"], 32768, 65536, 1048576, true);
-  define("gemini-2.5-pro",            1, ["text", "vision", "thinking", "code"],                24576, 65536, 1048576, true);
-  define("gemini-3.1-pro",            1, ["text", "vision", "thinking", "code"],                24576, 65536, 1048576, true);
-  define("gemini-3.1-pro-latest",     1, ["text", "vision", "thinking", "code"],                24576, 65536, 1048576, true);
+  // Primary Flagship Generative Models (Active & Tested with Google GenAI SDK)
+  // 1. gemini-3.8-flash: Recommended default for high intelligence and quality vector synthesis
+  define("gemini-3.8-flash", 1, ["text", "vision", "thinking", "code"], 0, 65536, 1048576, true);
 
-  // ── Tier 2: High-Performance Flash ───────────────────────────────────────
-  define("gemini-3.8-flash",          2, ["text", "vision", "thinking", "code"],                16384, 65536, 1048576, true);
-  define("gemini-3.8-flash-latest",   2, ["text", "vision", "thinking", "code"],                16384, 65536, 1048576, true);
-  define("gemini-3.7-flash",          2, ["text", "vision", "thinking", "code"],                16384, 65536, 1048576, true);
-  define("gemini-3.7-flash-exp",      2, ["text", "vision", "thinking", "code"],                16384, 65536, 1048576, true);
+  // 2. gemini-3.1-flash-lite: High throughput, sub-second latency, ultra-resilient fallback
+  define("gemini-3.1-flash-lite", 2, ["text", "vision", "code"], 0, 16384, 524288, true);
 
-  // ── Tier 3: Standard Flash ───────────────────────────────────────────────
-  define("gemini-3.6-flash",          3, ["text", "vision", "thinking", "code"],                8192,  32768, 1048576, true);
-  define("gemini-3.5-flash",          3, ["text", "vision", "thinking", "code"],                8192,  32768, 1048576, true);
-  define("gemini-2.5-flash",          3, ["text", "vision", "thinking", "code"],                8192,  32768, 1048576, true);
+  // 3. gemini-2.5-flash: Proven stable flash fallback
+  define("gemini-2.5-flash", 3, ["text", "vision", "thinking", "code"], 0, 32768, 1048576, true);
 
-  // ── Tier 4: Lightweight / Specialized ────────────────────────────────────
-  define("gemini-3.5-flash-lite",     4, ["text", "code"],                                      0,     16384, 524288,  true);
-  define("gemini-3.1-flash-lite",     4, ["text", "code"],                                      0,     16384, 524288,  true);
-  define("gemini-2.5-flash-lite",     4, ["text", "code"],                                      0,     16384, 524288,  true);
-  define("gemini-omni-flash",         4, ["text", "vision", "audio", "code"],                   4096,  32768, 1048576, true);
-
-  // ── Tier 5: Specialized / Non-text ───────────────────────────────────────
-  define("gemini-3.1-flash-image",    5, ["text", "vision", "image-gen"],                       0,     16384, 524288,  true);
-  define("gemini-3-pro-image",        5, ["text", "vision", "image-gen"],                       0,     32768, 1048576, true);
-
-  // Gemma open-weight models (no thinking config, no JSON mode guarantee)
-  define("gemma-4-31b-it",            4, ["text", "code"],                                      0,     8192,  131072,  false);
-  define("gemma-4-26b-a4b-it",        4, ["text", "code"],                                      0,     8192,  131072,  false);
-
-  // Audio/TTS — excluded from SVG generation but registered for completeness
-  // define("gemini-3.1-flash-tts-preview", 5, ["audio"], 0, 8192, 32768, false);
-  // define("gemini-live-2.5-flash-native-audio", 5, ["audio"], 0, 8192, 32768, false);
-  // define("aqa-v2", 5, ["text"], 0, 8192, 32768, false); // Attributed QA — not useful for generation
+  // 4. gemini-flash-latest: General flash alias
+  define("gemini-flash-latest", 4, ["text", "vision", "code"], 0, 32768, 1048576, true);
 
   return registry;
 }
@@ -294,26 +271,24 @@ class TaskClassifier {
     if (complexityScore >= 7) {
       complexity = "extreme";
       preferredTier = 1;
-      thinkingBudget = 24576;
+      thinkingBudget = 0;
       requiredCaps.add("thinking");
-      requiredCaps.add("deep-think");
     } else if (complexityScore >= 5) {
       complexity = "complex";
       preferredTier = 1;
-      thinkingBudget = 16384;
+      thinkingBudget = 0;
       requiredCaps.add("thinking");
     } else if (complexityScore >= 3) {
       complexity = "moderate";
-      preferredTier = 2;
-      thinkingBudget = 8192;
-      requiredCaps.add("thinking");
+      preferredTier = 1;
+      thinkingBudget = 0;
     } else if (complexityScore >= 1) {
       complexity = "simple";
-      preferredTier = 3;
-      thinkingBudget = 2048;
+      preferredTier = 2;
+      thinkingBudget = 0;
     } else {
       complexity = "trivial";
-      preferredTier = 4;
+      preferredTier = 2;
       thinkingBudget = 0;
     }
 
@@ -654,14 +629,11 @@ class ModelOrchestrator {
           `${error.message?.substring(0, 200)}`
         );
 
-        // If rate limited, add a delay before trying next model
+        // If rate limited, short pause; for transient, try next model immediately
         if (this.isRateLimitError(error)) {
-          console.warn(`[Orchestrator] Rate limit detected. Waiting 10s before next attempt...`);
-          await this.sleep(10_000);
-        } else if (this.isTransientError(error)) {
-          await this.sleep(2000 * (attempt + 1));
+          await this.sleep(1000);
         }
-        // Non-transient errors: immediately try next model
+        // Non-transient or 503 errors: immediately try next candidate model
       }
     }
 
@@ -690,12 +662,12 @@ class ModelOrchestrator {
     modelId: string,
     contents: any[],
     config: any,
-    retries: number = 3,
-    baseDelay: number = 2000
+    retries: number = 1,
+    baseDelay: number = 500
   ): Promise<{ text: string | undefined }> {
     let lastError: any;
 
-    for (let i = 0; i < retries; i++) {
+    for (let i = 0; i <= retries; i++) {
       try {
         const result = await ai.models.generateContent({
           model: modelId,
@@ -706,23 +678,26 @@ class ModelOrchestrator {
       } catch (error: any) {
         lastError = error;
 
-        if (this.isRateLimitError(error)) {
-          if (i < retries - 1) {
-            const waitTime = 30_000; // 30s for rate limits
-            console.warn(`[Retry] Rate limit on ${modelId}, waiting ${waitTime}ms (attempt ${i + 1}/${retries})`);
-            await this.sleep(waitTime);
-            continue;
-          }
-        } else if (this.isTransientError(error)) {
-          if (i < retries - 1) {
-            const waitTime = baseDelay * Math.pow(2, i);
-            console.warn(`[Retry] Transient error on ${modelId}, waiting ${waitTime}ms (attempt ${i + 1}/${retries})`);
-            await this.sleep(waitTime);
-            continue;
-          }
+        // If 404 / NOT_FOUND, the model is unsupported or does not exist — do NOT retry
+        if (
+          error?.status === 404 ||
+          error?.code === 404 ||
+          (typeof error?.message === "string" && (
+            error.message.includes("404") ||
+            error.message.includes("not found") ||
+            error.message.includes("no longer available")
+          ))
+        ) {
+          throw error;
         }
 
-        // Non-retryable error or exhausted retries
+        if (i < retries && (this.isTransientError(error) || this.isRateLimitError(error))) {
+          const waitTime = baseDelay * (i + 1);
+          console.warn(`[Retry] Transient spike on ${modelId} (${error.message?.slice(0, 80)}), retrying in ${waitTime}ms...`);
+          await this.sleep(waitTime);
+          continue;
+        }
+
         throw error;
       }
     }
@@ -732,69 +707,96 @@ class ModelOrchestrator {
 
   /**
    * Extracts valid JSON from potentially noisy model output.
-   * Handles markdown fences, leading/trailing garbage, and structural recovery.
+   * Handles markdown fences, literal control chars in SVG strings, and regex SVG recovery.
    */
   private static extractCleanJson(raw: string): string {
+    if (!raw) throw new Error("Empty model response");
     let text = raw.trim();
 
-    // Strip markdown code fences
-    if (text.startsWith("```")) {
-      text = text.replace(/^```(?:json|JSON)?\s*\n?/, "").replace(/\n?\s*```\s*$/, "").trim();
-    }
+    // 1. Strip markdown code fences
+    text = text.replace(/^```(?:json|JSON|xml|svg)?\s*\n?/i, "").replace(/\n?\s*```\s*$/i, "").trim();
 
-    // Attempt direct parse
+    // 2. Direct JSON.parse attempt
     try {
       JSON.parse(text);
       return text;
     } catch {
-      // Continue to recovery
+      // Continue to extraction
     }
 
-    // Find outermost JSON object
-    let depth = 0;
-    let firstBrace = -1;
-    let lastBrace = -1;
-
-    for (let i = 0; i < text.length; i++) {
-      const char = text[i];
-      if (char === '{') {
-        if (depth === 0) firstBrace = i;
-        depth++;
-      } else if (char === '}') {
-        depth--;
-        if (depth === 0) {
-          lastBrace = i;
-          break; // Found the complete outermost object
-        }
-      }
-    }
-
-    if (firstBrace !== -1 && lastBrace !== -1) {
+    // 3. String-safe JSON object extraction from outermost '{' to last '}'
+    const firstBrace = text.indexOf('{');
+    const lastBrace = text.lastIndexOf('}');
+    if (firstBrace !== -1 && lastBrace > firstBrace) {
       const candidate = text.substring(firstBrace, lastBrace + 1);
       try {
         JSON.parse(candidate);
         return candidate;
       } catch {
-        // Fall through
+        // Sanitize control characters (unescaped newlines/tabs inside string literals)
+        const sanitized = this.sanitizeJsonControlChars(candidate);
+        try {
+          JSON.parse(sanitized);
+          return sanitized;
+        } catch {
+          // Trailing commas cleanup
+          const cleaned = sanitized.replace(/,\s*([}\]])/g, "$1");
+          try {
+            JSON.parse(cleaned);
+            return cleaned;
+          } catch {
+            // Keep going to SVG fallback
+          }
+        }
       }
     }
 
-    // Last resort: try to fix common JSON issues
-    // Trailing commas before closing braces/brackets
-    let cleaned = text.replace(/,\s*([}\]])/g, "$1");
-    // Unescaped newlines in strings (very common in SVG content)
-    // This is a dangerous fix but better than total failure
-    try {
-      JSON.parse(cleaned);
-      return cleaned;
-    } catch {
-      // Give up on this text
+    // 4. SVG Extraction Fallback:
+    // If model returned direct SVG markup without JSON envelope:
+    const svgMatch = text.match(/<svg[\s\S]*?<\/svg>/i);
+    if (svgMatch) {
+      const extractedSvg = svgMatch[0];
+      const titleMatch = text.match(/<title>([^<]+)<\/title>/i);
+      const fallbackObj = {
+        title: titleMatch ? titleMatch[1].trim() : "Synthesized Artwork",
+        description: "Vector artwork synthesized via VECTORA Engine",
+        svg: extractedSvg,
+        layers: [],
+        animationNotes: "Synthesized self-contained vector graphic.",
+      };
+      return JSON.stringify(fallbackObj);
     }
 
     throw new Error(
-      `Failed to extract valid JSON from model output. ` +
-      `Raw output starts with: "${text.substring(0, 100)}..."`
+      `Failed to extract valid JSON from model output. Raw output starts with: "${text.substring(0, 100)}..."`
     );
+  }
+
+  private static sanitizeJsonControlChars(str: string): string {
+    let inString = false;
+    let escaped = false;
+    let result = "";
+    for (let i = 0; i < str.length; i++) {
+      const ch = str[i];
+      if (ch === '"' && !escaped) {
+        inString = !inString;
+        result += ch;
+      } else if (inString) {
+        if (ch === "\n") {
+          result += "\\n";
+        } else if (ch === "\r") {
+          result += "\\r";
+        } else if (ch === "\t") {
+          result += "\\t";
+        } else {
+          result += ch;
+        }
+      } else {
+        result += ch;
+      }
+      escaped = ch === "\\" && !escaped;
+    }
+    return result;
   }
 
   private static isRateLimitError(error: any): boolean {

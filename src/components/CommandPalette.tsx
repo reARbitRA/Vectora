@@ -13,14 +13,15 @@ import {
   Image as ImageIcon,
   Scan,
   Compass,
-  X
+  X,
+  Clock
 } from 'lucide-react';
 import { VectorArtwork } from '../types';
 
 interface CommandPaletteProps {
   isOpen: boolean;
   onClose: () => void;
-  onSelectView: (view: 'home' | 'studio' | 'gallery') => void;
+  onSelectView: (view: 'home' | 'studio' | 'gallery' | 'history') => void;
   onQuickGenerate?: (prompt: string) => void;
   onDownloadSvg?: () => void;
   onDownloadPng?: () => void;
@@ -97,6 +98,18 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
       category: 'Views',
       action: () => {
         onSelectView('gallery');
+        onClose();
+      },
+    },
+    {
+      id: 'view-history',
+      title: 'Open Design History',
+      subtitle: 'Review, duplicate, or reload recent session artworks',
+      icon: Clock,
+      shortcut: 'Ctrl+4',
+      category: 'Views',
+      action: () => {
+        onSelectView('history');
         onClose();
       },
     },

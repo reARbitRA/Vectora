@@ -52,6 +52,7 @@
     │   ├── DesignSpecPanel.tsx      # SVG geometry, DOM node metric & AST telemetry inspector
     │   ├── ExportModal.tsx          # Multi-format export (SVG, React TSX, CSS Data URI, PNG)
     │   ├── GenerationLoader.tsx     # Vector synthesis loading screen with animated wireframe
+    │   ├── HistoryView.tsx          # Session design history & artwork recovery manager
     │   ├── HomeView.tsx             # Main landing view, blueprint showcase & prompt launcher
     │   ├── ImportModal.tsx          # Multimodal raster-to-vector & brief-to-vector parser
     │   ├── IntroLoader.tsx          # Initial boot loader with diagnostic system telemetry
@@ -163,6 +164,7 @@
 | **`ImportModal.tsx`** | Multimodal import dialog accepting raster image uploads (`.png`, `.jpg`, `.webp`) for vectorization, alongside text briefs and design specs. |
 | **`ExportModal.tsx`** | Export pipeline supporting raw `.svg` files, typed React `.tsx` components, standalone CSS Data URIs, and high-res raster `.png` exports. |
 | **`HomeView.tsx`** | Welcoming portal with hero showcase, instant prompt synthesizer, curated sample artboards, and feature navigation. |
+| **`HistoryView.tsx`** | Session design history, artwork duplication, thumbnail preview grid, and localStorage persistence manager. |
 | **`MasterpieceGallery.tsx`** | Curated catalog of pre-engineered vector artworks with one-click loading into the active studio session. |
 | **`Navbar.tsx`** | Top header navigation featuring view switching, workspace layout presets (`full`, `minimalist`, `canvas-focus`), undo/redo buttons, and quick actions. |
 | **`RefinePromptBar.tsx`** | Floating contextual prompt bar at the studio base for conversational iterative AI refinement of the active graphic. |

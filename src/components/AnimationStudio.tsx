@@ -99,10 +99,10 @@ export const AnimationStudio: React.FC<AnimationStudioProps> = ({
 
   // AUTO-BAKE ENGINE: Synchronize static CSS @keyframes directly into artwork when enabled
   useEffect(() => {
-    if (config.autoBake) {
+    if (config.autoBake && animatedSvg && animatedSvg !== artwork.svg) {
       onUpdateSvg(animatedSvg);
     }
-  }, [config.autoBake, animatedSvg, onUpdateSvg]);
+  }, [config.autoBake, animatedSvg, artwork.svg, onUpdateSvg]);
 
   // Handle Play/Pause
   const handleTogglePlay = () => {

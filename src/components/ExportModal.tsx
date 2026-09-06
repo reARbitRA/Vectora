@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { toast } from 'sonner';
 import { ExportPreset, VectorArtwork } from '../types';
 import {
   downloadBlob,
@@ -261,15 +262,21 @@ export const ExportModal: React.FC<ExportModalProps> = ({
   };
 
   const handleDownloadPng = async () => {
+    const toastId = toast.loading('Exporting PNG...', {
+      description: `Rasterizing canvas at ${pngScale}x resolution...`
+    });
     try {
       setIsExportingPng(true);
       const blob = await exportSvgToPng(artwork.svg, pngScale);
-      downloadBlob(
-        blob,
-        `${artwork.title.toLowerCase().replace(/\s+/g, '-')}-${pngScale * 1000}px.png`
-      );
-    } catch (err) {
+      const filename = `${artwork.title.toLowerCase().replace(/\s+/g, '-')}-${pngScale * 1000}px.png`;
+      downloadBlob(blob, filename);
+      toast.success('High-Res PNG Exported', { id: toastId, description: filename });
+    } catch (err: any) {
       console.error('Failed to export PNG:', err);
+      toast.error('PNG rasterization failed', {
+        id: toastId,
+        description: err?.message || 'Could not rasterize vector markup'
+      });
     } finally {
       setIsExportingPng(false);
     }

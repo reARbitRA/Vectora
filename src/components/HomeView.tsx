@@ -5,9 +5,10 @@ import { Send, Upload, X, Image as ImageIcon, FileText, Sparkles } from 'lucide-
 interface HomeViewProps {
   onGenerate: (prompt: string, file?: File) => void;
   isGenerating: boolean;
+  onGoToStudio?: () => void;
 }
 
-export const HomeView: React.FC<HomeViewProps> = ({ onGenerate, isGenerating }) => {
+export const HomeView: React.FC<HomeViewProps> = ({ onGenerate, isGenerating, onGoToStudio }) => {
   const [prompt, setPrompt] = useState('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -146,6 +147,17 @@ export const HomeView: React.FC<HomeViewProps> = ({ onGenerate, isGenerating }) 
             </button>
           ))}
         </div>
+
+        {onGoToStudio && (
+          <div className="mt-6 text-center">
+            <button
+              onClick={onGoToStudio}
+              className="text-xs font-mono text-white/40 hover:text-[#00FF00] transition-colors underline underline-offset-4"
+            >
+              Or open the interactive Vector Studio canvas directly →
+            </button>
+          </div>
+        )}
       </motion.div>
     </div>
   );

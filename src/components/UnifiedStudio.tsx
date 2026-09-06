@@ -16,7 +16,8 @@ import { DesignSpecPanel } from './DesignSpecPanel';
 import { PluginGallery } from './PluginGallery';
 import { ExportModal } from './ExportModal';
 import { ImportModal } from './ImportModal';
-import { LayerSpec, VectorArtwork } from '../types';
+import { RefinePromptBar } from './RefinePromptBar';
+import { CanvasSettings, LayerSpec, VectorArtwork } from '../types';
 import { exportSvgToPng, downloadBlob } from '../utils/svgParser';
 
 interface UnifiedStudioProps {
@@ -45,10 +46,57 @@ export const UnifiedStudio: React.FC<UnifiedStudioProps> = ({
   // Real Layer State
   const [layers, setLayers] = useState<LayerSpec[]>(artwork.layers || []);
 
-  // Update layers when artwork changes
+  // Dynamic Canvas Viewport Settings
+  const [canvasSettings, setCanvasSettings] = useState<CanvasSettings>({
+    zoom: 1,
+    pan: { x: 0, y: 0 },
+    showGrid: false,
+    gridType: 'cartesian',
+    bgMode: 'dark',
+    strokeScale: 1,
+    grainIntensity: 0,
+    glowIntensity: 0,
+    aspectRatio: '1:1',
+  });
+
+  const handleUpdateSettings = (newSettings: Partial<CanvasSettings>) => {
+    setCanvasSettings((prev) => ({ ...prev, ...newSettings }));
+  };
+
+  // Undo / Redo SVG Stack
+  const [svgHistory, setSvgHistory] = useState<string[]>([artwork.svg]);
+  const [historyIndex, setHistoryIndex] = useState(0);
+
+  // Sync layers and history when artwork changes
   React.useEffect(() => {
     if (artwork.layers) setLayers(artwork.layers);
+    setSvgHistory([artwork.svg]);
+    setHistoryIndex(0);
   }, [artwork.id]);
+
+  const handleUndo = () => {
+    if (historyIndex > 0) {
+      const prevSvg = svgHistory[historyIndex - 1];
+      setHistoryIndex(historyIndex - 1);
+      onUpdateSvg(prevSvg);
+      toast.info('Undo applied', { description: 'Reverted canvas to previous state' });
+    }
+  };
+
+  const handleRedo = () => {
+    if (historyIndex < svgHistory.length - 1) {
+      const nextSvg = svgHistory[historyIndex + 1];
+      setHistoryIndex(historyIndex + 1);
+      onUpdateSvg(nextSvg);
+      toast.info('Redo applied', { description: 'Restored forward canvas state' });
+    }
+  };
+
+  const handleUpdateSvgWithHistory = (newSvg: string) => {
+    onUpdateSvg(newSvg);
+    setSvgHistory((prev) => [...prev.slice(0, historyIndex + 1), newSvg]);
+    setHistoryIndex((prev) => prev + 1);
+  };
 
   const handleUpdateLayers = (newLayers: LayerSpec[]) => {
     setLayers(newLayers);
@@ -181,7 +229,7 @@ export const UnifiedStudio: React.FC<UnifiedStudioProps> = ({
 
       const result = await response.json();
       if (result.success && result.data) {
-        onUpdateSvg(result.data.svg);
+        handleUpdateSvgWithHistory(result.data.svg);
         if (result.data.layers) setLayers(result.data.layers);
         setChatMessage('');
         toast.success('Design Refined', { id: toastId });
@@ -507,17 +555,7 @@ export const UnifiedStudio: React.FC<UnifiedStudioProps> = ({
         <StudioCanvas 
           artwork={artwork} 
           layers={layers} 
-          settings={{
-            zoom: 1,
-            pan: { x: 0, y: 0 },
-            showGrid: false,
-            gridType: 'cartesian',
-            bgMode: 'dark',
-            strokeScale: 1,
-            grainIntensity: 0,
-            glowIntensity: 0,
-            aspectRatio: '1:1'
-          }}
+          settings={canvasSettings}
           workspaceLayout="canvas-focus"
           onSelectLayout={() => {}}
           onToggleLayers={() => setActiveTool(activeTool === 'layers' ? null : 'layers')}
@@ -525,12 +563,15 @@ export const UnifiedStudio: React.FC<UnifiedStudioProps> = ({
           onOpenExport={() => setIsExportModalOpen(true)}
           onOpenImport={() => setIsImportModalOpen(true)}
           onOpenAnimator={() => setActiveTool('animation')}
-          onUpdateSettings={() => {}}
-          onUndo={() => {}}
-          onRedo={() => {}}
-          canUndo={false}
-          canRedo={false}
+          onUpdateSettings={handleUpdateSettings}
+          onUndo={handleUndo}
+          onRedo={handleRedo}
+          canUndo={historyIndex > 0}
+          canRedo={historyIndex < svgHistory.length - 1}
         />
+
+        {/* Real-Time On-Canvas Prompt Refinement */}
+        <RefinePromptBar onRefine={handleRefine} isRefining={isRefining} />
       </div>
 
       {/* Modals */}
