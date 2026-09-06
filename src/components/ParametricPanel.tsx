@@ -26,7 +26,7 @@ export const ParametricPanel: React.FC<ParametricPanelProps> = ({
   onClose,
 }) => {
   return (
-    <aside className="w-80 bg-[#0A0A0A] border-l border-[#333333] flex flex-col h-full z-20 select-none font-mono">
+    <aside className="w-[85vw] sm:w-80 max-w-full bg-[#0A0A0A] border-l border-[#333333] flex flex-col h-full z-20 select-none font-mono">
       {/* Header */}
       <div className="p-3.5 border-b border-[#333333] flex items-center justify-between">
         <div className="flex items-center gap-2">

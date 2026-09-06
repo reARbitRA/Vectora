@@ -312,7 +312,7 @@ export const LayerPanel: React.FC<LayerPanelProps> = ({
   };
 
   return (
-    <aside className="w-88 md:w-96 bg-[#0A0A0A] border-l border-[#333333] flex flex-col h-full z-20 select-none font-mono">
+    <aside className="w-[85vw] sm:w-80 md:w-96 max-w-full bg-[#0A0A0A] border-l border-[#333333] flex flex-col h-full z-20 select-none font-mono">
       {/* Header */}
       <div className="p-3 border-b border-[#333333] flex items-center justify-between">
         <div className="flex items-center gap-2">

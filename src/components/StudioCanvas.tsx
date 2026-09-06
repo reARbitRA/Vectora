@@ -58,7 +58,7 @@ export const StudioCanvas: React.FC<StudioCanvasProps> = ({
   const [isPanning, setIsPanning] = useState(false);
   const [isSpacePressed, setIsSpacePressed] = useState(false);
   const [startPan, setStartPan] = useState({ x: 0, y: 0 });
-  const [showShortcutsTooltip, setShowShortcutsTooltip] = useState(false);
+  const [showShortcuts, setShowShortcuts] = useState(false);
 
   // Track Space bar for Space + Drag panning
   useEffect(() => {
@@ -91,6 +91,11 @@ export const StudioCanvas: React.FC<StudioCanvasProps> = ({
     try {
       const parser = new DOMParser();
       const doc = parser.parseFromString(artwork.svg, 'image/svg+xml');
+      const errorNode = doc.querySelector('parsererror');
+      if (errorNode) {
+        console.warn('SVG Parse Error detected on canvas:', errorNode.textContent);
+        return artwork.svg;
+      }
       const rootSvg = doc.querySelector('svg');
       if (!rootSvg) return artwork.svg;
 
@@ -261,7 +266,7 @@ export const StudioCanvas: React.FC<StudioCanvasProps> = ({
       >
         <div
           id="vector-artboard"
-          className="relative max-w-[860px] max-h-[860px] w-[85vw] h-[85vw] md:w-[760px] md:h-[760px] border-2 border-[#333333] shadow-none pointer-events-auto"
+          className="relative w-[min(90vw,calc(100vh-200px),740px)] h-[min(90vw,calc(100vh-200px),740px)] max-w-full max-h-full aspect-square border-2 border-[#333333] shadow-none pointer-events-auto flex items-center justify-center"
           style={{
             filter: settings.glowIntensity > 0 ? `drop-shadow(0 0 ${settings.glowIntensity * 24}px rgba(0, 255, 0, 0.45))` : undefined,
           }}
@@ -279,30 +284,30 @@ export const StudioCanvas: React.FC<StudioCanvasProps> = ({
 
           {/* Render Active SVG */}
           <div
-            className="w-full h-full flex items-center justify-center"
+            className="w-full h-full flex items-center justify-center [&>svg]:max-w-full [&>svg]:max-h-full"
             dangerouslySetInnerHTML={{ __html: processedSvg }}
           />
         </div>
       </div>
 
-      {/* Floating Real-Time Zoom Level Indicator & Viewport HUD */}
-      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1.5 bg-[#0A0A0A]/95 backdrop-blur-md p-1.5 border-2 border-[#333333] shadow-2xl select-none font-mono">
+      {/* Floating Canvas Controls Dock (Docked at Bottom-Right to avoid collision with Refine Bar) */}
+      <div className="absolute bottom-4 right-3 md:right-4 z-20 flex items-center gap-1 bg-[#0A0A0A]/95 backdrop-blur-md p-1 md:p-1.5 border border-[#333333] shadow-2xl select-none font-mono">
         {/* Zoom Out */}
         <button
           id="btn-zoom-out"
           onClick={() => handleZoom(-0.15)}
           title="Zoom Out (Scroll Down)"
-          className="p-1.5 text-[#888888] hover:text-[#FFFFFF] hover:bg-[#222222] transition-colors"
+          className="p-1 md:p-1.5 text-[#888888] hover:text-[#FFFFFF] hover:bg-[#222222] transition-colors"
         >
-          <ZoomOut className="w-4 h-4" />
+          <ZoomOut className="w-3.5 h-3.5 md:w-4 md:h-4" />
         </button>
 
         {/* Live Real-Time Zoom Percentage Badge */}
         <div
           title="Current Zoom Level"
-          className="px-2.5 py-1 bg-[#141414] border border-[#222222] flex items-center gap-1.5 min-w-[72px] justify-center"
+          className="px-1.5 md:px-2 py-0.5 md:py-1 bg-[#141414] border border-[#222222] flex items-center gap-1 min-w-[50px] md:min-w-[62px] justify-center"
         >
-          <span className="text-xs font-mono font-bold text-[#00FF00]">
+          <span className="text-[10px] md:text-xs font-mono font-bold text-[#00FF00]">
             {zoomPercent}%
           </span>
         </div>
@@ -312,26 +317,26 @@ export const StudioCanvas: React.FC<StudioCanvasProps> = ({
           id="btn-zoom-in"
           onClick={() => handleZoom(0.15)}
           title="Zoom In (Scroll Up)"
-          className="p-1.5 text-[#888888] hover:text-[#FFFFFF] hover:bg-[#222222] transition-colors"
+          className="p-1 md:p-1.5 text-[#888888] hover:text-[#FFFFFF] hover:bg-[#222222] transition-colors"
         >
-          <ZoomIn className="w-4 h-4" />
+          <ZoomIn className="w-3.5 h-3.5 md:w-4 md:h-4" />
         </button>
 
-        <div className="w-[1px] h-5 bg-[#333333] mx-1" />
+        <div className="w-[1px] h-4 bg-[#333333] mx-0.5" />
 
         {/* Dedicated Reset Zoom to 100% Button */}
         <button
           id="btn-reset-zoom-100"
           onClick={handleResetView}
           title="Reset Zoom to 100% & Center Pan (Ctrl+0)"
-          className={`flex items-center gap-1.5 px-2.5 py-1 text-xs font-bold uppercase transition-all ${
+          className={`flex items-center gap-1 px-1.5 md:px-2.5 py-1 text-[10px] md:text-xs font-bold uppercase transition-all ${
             isDefaultZoom
               ? 'bg-[#181818] text-[#888888] border border-[#282828] opacity-60'
               : 'bg-[#00FF00] hover:bg-[#33FF33] text-[#000000] border border-[#00FF00]'
           }`}
         >
-          <RotateCcw className="w-3.5 h-3.5" />
-          <span>Reset Zoom</span>
+          <RotateCcw className="w-3 h-3 md:w-3.5 md:h-3.5" />
+          <span className="hidden sm:inline">100%</span>
         </button>
 
         {/* Fit View Preset */}
@@ -339,66 +344,35 @@ export const StudioCanvas: React.FC<StudioCanvasProps> = ({
           id="btn-fit-view"
           onClick={handleFitToView}
           title="Fit Artboard to Screen"
-          className="px-2 py-1 bg-[#141414] hover:bg-[#222222] text-[#888888] hover:text-[#FFFFFF] border border-[#333333] text-[11px] font-bold uppercase"
+          className="px-1.5 md:px-2 py-1 bg-[#141414] hover:bg-[#222222] text-[#888888] hover:text-[#FFFFFF] border border-[#333333] text-[10px] md:text-[11px] font-bold uppercase"
         >
           Fit
         </button>
 
-        {/* Pan Offset Telemetry */}
-        {(settings.pan.x !== 0 || settings.pan.y !== 0) && (
-          <span
-            title="Pan coordinate offset from center"
-            className="text-[10px] text-[#666666] px-1 hidden md:inline-block"
-          >
-            {settings.pan.x > 0 ? `+${settings.pan.x}` : settings.pan.x},{settings.pan.y > 0 ? `+${settings.pan.y}` : settings.pan.y}
-          </span>
-        )}
-      </div>
+        <div className="w-[1px] h-4 bg-[#333333] mx-0.5" />
 
-      {/* Bottom Left: Keyboard Shortcuts Manager & Tooltip Button */}
-      <div className="absolute bottom-4 left-4 z-20 font-mono">
+        {/* Integrated Shortcuts Trigger */}
         <div className="relative">
           <button
-            id="btn-shortcuts-tooltip"
-            onClick={() => setShowShortcutsTooltip(!showShortcutsTooltip)}
-            onMouseEnter={() => setShowShortcutsTooltip(true)}
-            onMouseLeave={() => setShowShortcutsTooltip(false)}
-            title="View Keyboard Shortcuts (Ctrl+S, Space+Drag, Ctrl+Z)"
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 border text-xs font-bold uppercase transition-all ${
-              showShortcutsTooltip
-                ? 'bg-[#00FF00] text-[#000000] border-[#00FF00]'
-                : 'bg-[#0A0A0A] text-[#888888] hover:text-[#FFFFFF] border-[#333333] hover:border-[#00FF00]'
-            }`}
+            onClick={() => setShowShortcuts(!showShortcuts)}
+            title="Keyboard Shortcuts & Gestures (?)"
+            className="p-1 md:p-1.5 text-[#888888] hover:text-[#00FF00] hover:bg-[#222222] transition-colors"
           >
-            <Keyboard className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Shortcuts</span>
+            <HelpCircle className="w-3.5 h-3.5 md:w-4 md:h-4" />
           </button>
 
-          {/* Shortcuts Popover Tooltip */}
-          {showShortcutsTooltip && (
-            <div
-              onMouseEnter={() => setShowShortcutsTooltip(true)}
-              onMouseLeave={() => setShowShortcutsTooltip(false)}
-              className="absolute bottom-10 left-0 w-64 md:w-72 bg-[#0A0A0A] border-2 border-[#333333] p-3 shadow-2xl z-30 space-y-2.5"
-            >
-              <div className="flex items-center justify-between border-b border-[#222222] pb-1.5">
-                <div className="flex items-center gap-1.5 text-xs font-bold text-[#FFFFFF] uppercase tracking-wider">
-                  <Keyboard className="w-3.5 h-3.5 text-[#00FF00]" />
-                  <span>Global Keymaps</span>
-                </div>
-                <span className="text-[9px] text-[#00FF00] bg-[#141414] px-1.5 py-0.5 border border-[#333333]">
-                  Active
+          {showShortcuts && (
+            <div className="absolute bottom-10 right-0 w-72 bg-[#0D0D0D] border-2 border-[#333333] shadow-2xl p-3 z-50 text-xs">
+              <div className="flex items-center justify-between border-b border-[#222222] pb-2 mb-2">
+                <span className="text-[11px] font-bold text-[#00FF00] uppercase tracking-wider">
+                  Canvas Shortcuts
                 </span>
+                <button onClick={() => setShowShortcuts(false)} className="text-[#666666] hover:text-[#FFFFFF]">
+                  ✕
+                </button>
               </div>
 
               <div className="space-y-1.5 text-[11px]">
-                <div className="flex items-center justify-between py-0.5">
-                  <span className="text-[#AAAAAA]">Save / Export SVG</span>
-                  <kbd className="px-1.5 py-0.5 bg-[#1A1A1A] border border-[#333333] text-[#00FF00] font-bold text-[10px]">
-                    Ctrl + S
-                  </kbd>
-                </div>
-
                 <div className="flex items-center justify-between py-0.5">
                   <span className="text-[#AAAAAA]">Pan Canvas</span>
                   <kbd className="px-1.5 py-0.5 bg-[#1A1A1A] border border-[#333333] text-[#00FF00] font-bold text-[10px]">
@@ -407,49 +381,28 @@ export const StudioCanvas: React.FC<StudioCanvasProps> = ({
                 </div>
 
                 <div className="flex items-center justify-between py-0.5">
-                  <span className="text-[#AAAAAA]">Undo Action</span>
+                  <span className="text-[#AAAAAA]">Zoom In / Out</span>
                   <kbd className="px-1.5 py-0.5 bg-[#1A1A1A] border border-[#333333] text-[#00FF00] font-bold text-[10px]">
-                    Ctrl + Z
+                    Scroll Wheel
                   </kbd>
                 </div>
 
                 <div className="flex items-center justify-between py-0.5">
-                  <span className="text-[#AAAAAA]">Redo Action</span>
-                  <kbd className="px-1.5 py-0.5 bg-[#1A1A1A] border border-[#333333] text-[#00FF00] font-bold text-[10px]">
-                    Ctrl + Y / ⇧⌘Z
-                  </kbd>
-                </div>
-
-                <div className="flex items-center justify-between py-0.5">
-                  <span className="text-[#AAAAAA]">Reset Zoom (100%)</span>
+                  <span className="text-[#AAAAAA]">Reset View 100%</span>
                   <kbd className="px-1.5 py-0.5 bg-[#1A1A1A] border border-[#333333] text-[#00FF00] font-bold text-[10px]">
                     Ctrl + 0
                   </kbd>
                 </div>
 
                 <div className="flex items-center justify-between py-0.5">
-                  <span className="text-[#AAAAAA]">Zoom In / Out</span>
+                  <span className="text-[#AAAAAA]">Fit to Window</span>
                   <kbd className="px-1.5 py-0.5 bg-[#1A1A1A] border border-[#333333] text-[#00FF00] font-bold text-[10px]">
-                    Mouse Wheel
+                    Shift + 1
                   </kbd>
                 </div>
 
                 <div className="flex items-center justify-between py-0.5">
-                  <span className="text-[#AAAAAA]">Toggle Layer Drawer</span>
-                  <kbd className="px-1.5 py-0.5 bg-[#1A1A1A] border border-[#333333] text-[#00FF00] font-bold text-[10px]">
-                    L
-                  </kbd>
-                </div>
-
-                <div className="flex items-center justify-between py-0.5">
-                  <span className="text-[#AAAAAA]">Toggle Parametric FX</span>
-                  <kbd className="px-1.5 py-0.5 bg-[#1A1A1A] border border-[#333333] text-[#00FF00] font-bold text-[10px]">
-                    P
-                  </kbd>
-                </div>
-
-                <div className="flex items-center justify-between py-0.5">
-                  <span className="text-[#AAAAAA]">Toggle Grid Overlay</span>
+                  <span className="text-[#AAAAAA]">Toggle Grid</span>
                   <kbd className="px-1.5 py-0.5 bg-[#1A1A1A] border border-[#333333] text-[#00FF00] font-bold text-[10px]">
                     G
                   </kbd>
@@ -459,36 +412,35 @@ export const StudioCanvas: React.FC<StudioCanvasProps> = ({
           )}
         </div>
       </div>
-
       {/* Top Floating Art Info & Canvas Settings Bar */}
-      <div className="absolute top-4 left-4 z-20 flex items-center gap-2 font-mono flex-wrap">
+      <div className="absolute top-3 left-3 md:top-4 md:left-4 z-20 flex items-center gap-1.5 md:gap-2 font-mono flex-nowrap max-w-[calc(100vw-24px)] overflow-x-auto select-none">
         {/* Style Badge */}
-        <div className="bg-[#0A0A0A] px-3 py-1.5 border border-[#333333] flex items-center gap-2.5">
-          <div className="w-2 h-2 bg-[#00FF00] animate-pulse" />
-          <span className="text-xs font-bold text-[#FFFFFF] uppercase tracking-wider">{artwork.style}</span>
-          <span className="text-[10px] font-mono text-[#888888] border-l border-[#333333] pl-2">
+        <div className="bg-[#0A0A0A]/90 backdrop-blur-md px-2.5 py-1 md:py-1.5 border border-[#333333] flex items-center gap-2 shrink-0">
+          <div className="w-1.5 h-1.5 md:w-2 md:h-2 bg-[#00FF00] animate-pulse" />
+          <span className="text-[11px] md:text-xs font-bold text-[#FFFFFF] uppercase tracking-wider">{artwork.style}</span>
+          <span className="text-[9px] md:text-[10px] font-mono text-[#888888] border-l border-[#333333] pl-1.5 hidden sm:inline-block">
             {artwork.viewBox || '0 0 1000 1000'}
           </span>
         </div>
 
         {/* Grid Overlay Mode Toggle */}
-        <div className="bg-[#0A0A0A] p-1 border border-[#333333] flex items-center gap-1">
+        <div className="bg-[#0A0A0A]/90 backdrop-blur-md p-1 border border-[#333333] flex items-center gap-1 shrink-0">
           <button
             id="btn-toggle-grid"
             onClick={() => onUpdateSettings({ showGrid: !settings.showGrid })}
             title={settings.showGrid ? 'Hide Grid (G)' : 'Show Grid (G)'}
-            className={`p-1.5 text-xs font-medium transition-colors ${
-              settings.showGrid ? 'bg-[#00FF00] text-[#00FF00]' : 'text-[#888888] hover:text-[#FFFFFF]'
+            className={`p-1 text-xs font-medium transition-colors ${
+              settings.showGrid ? 'bg-[#00FF00] text-[#000000]' : 'text-[#888888] hover:text-[#FFFFFF]'
             }`}
           >
-            <Grid className={`w-3.5 h-3.5 ${settings.showGrid ? 'text-[#000000]' : ''}`} />
+            <Grid className="w-3.5 h-3.5" />
           </button>
 
           {settings.showGrid && (
             <select
               value={settings.gridType}
               onChange={(e) => onUpdateSettings({ gridType: e.target.value as any })}
-              className="bg-transparent text-[11px] text-[#00FF00] font-mono focus:outline-none px-1 py-0.5 cursor-pointer uppercase font-bold"
+              className="bg-transparent text-[10px] md:text-[11px] text-[#00FF00] font-mono focus:outline-none px-1 py-0.5 cursor-pointer uppercase font-bold"
             >
               <option value="cartesian" className="bg-[#0A0A0A] text-[#FFFFFF]">Cartesian</option>
               <option value="isometric" className="bg-[#0A0A0A] text-[#FFFFFF]">Isometric</option>
@@ -498,13 +450,13 @@ export const StudioCanvas: React.FC<StudioCanvasProps> = ({
         </div>
 
         {/* Background Canvas Mode Selector */}
-        <div className="bg-[#0A0A0A] p-1 border border-[#333333] flex items-center gap-1">
+        <div className="bg-[#0A0A0A]/90 backdrop-blur-md p-1 border border-[#333333] flex items-center gap-0.5 shrink-0">
           {(['dark', 'light', 'obsidian', 'blueprint', 'checker'] as const).map((mode) => (
             <button
               key={mode}
               onClick={() => onUpdateSettings({ bgMode: mode })}
               title={`Canvas Background: ${mode}`}
-              className={`w-6 h-6 text-[10px] font-mono flex items-center justify-center transition-all ${
+              className={`w-5 h-5 md:w-6 md:h-6 text-[9px] md:text-[10px] font-mono flex items-center justify-center transition-all ${
                 settings.bgMode === mode
                   ? 'border border-[#00FF00] text-[#00FF00] font-bold bg-[#141414]'
                   : 'text-[#666666] hover:text-[#AAAAAA]'
@@ -524,10 +476,10 @@ export const StudioCanvas: React.FC<StudioCanvasProps> = ({
           <button
             onClick={onOpenAnimator}
             title="Open SVG Kinetic Animation Studio"
-            className="bg-[#0A0A0A] px-2.5 py-1.5 border border-[#333333] hover:border-[#00FF00] text-[#00FF00] text-xs font-mono uppercase flex items-center gap-1.5 transition-all shadow-md"
+            className="bg-[#0A0A0A]/90 backdrop-blur-md px-2 py-1 md:py-1.5 border border-[#333333] hover:border-[#00FF00] text-[#00FF00] text-[11px] md:text-xs font-mono uppercase flex items-center gap-1.5 transition-all shadow-md shrink-0"
           >
             <Film className="w-3.5 h-3.5" />
-            <span className="font-bold">Animate SVG</span>
+            <span className="font-bold hidden sm:inline">Animate</span>
           </button>
         )}
       </div>

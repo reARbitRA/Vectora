@@ -1,6 +1,11 @@
 import React, { useState, useRef } from 'react';
 import { VectorArtwork, ImportSourceType, ImportRequest } from '../types';
 import {
+  VECTORIZATION_TECHNIQUES,
+  VectorizationTechniqueId,
+  runVectorization,
+} from '../utils/vectorization';
+import {
   Upload,
   FileText,
   Image as ImageIcon,
@@ -16,7 +21,12 @@ import {
   RefreshCw,
   Zap,
   Sliders,
-  Eye
+  Eye,
+  PenTool,
+  Activity,
+  Radio,
+  Waves,
+  Flame,
 } from 'lucide-react';
 
 interface ImportModalProps {
@@ -83,6 +93,13 @@ export const ImportModal: React.FC<ImportModalProps> = ({
   const [complexity, setComplexity] = useState<'minimal' | 'balanced' | 'intricate' | 'ultra'>('balanced');
   const [paletteMood, setPaletteMood] = useState('Harmonious Precision');
   const [customDirectives, setCustomDirectives] = useState('');
+  const [vectorEngineMode, setVectorEngineMode] = useState<'algorithmic' | 'ai'>('algorithmic');
+  const [selectedTechnique, setSelectedTechnique] = useState<VectorizationTechniqueId>('centerline');
+  const [detailLevel, setDetailLevel] = useState<'low' | 'medium' | 'high'>('medium');
+  const [invertLuminance, setInvertLuminance] = useState(false);
+  const [vectorColor, setVectorColor] = useState('#00FF00');
+  const [vectorBgColor, setVectorBgColor] = useState('#0A0A0A');
+  const [techniqueCategoryFilter, setTechniqueCategoryFilter] = useState<string>('all');
   const [isProcessing, setIsProcessing] = useState(false);
   const [statusMessage, setStatusMessage] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -135,11 +152,70 @@ export const ImportModal: React.FC<ImportModalProps> = ({
     }
   };
 
+  const extractImageDataFromDataUri = (dataUri: string): Promise<ImageData> => {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => {
+        const maxDim = 800;
+        let w = img.width;
+        let h = img.height;
+        if (w > maxDim || h > maxDim) {
+          if (w > h) {
+            h = Math.round((h * maxDim) / w);
+            w = maxDim;
+          } else {
+            w = Math.round((w * maxDim) / h);
+            h = maxDim;
+          }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.max(10, w);
+        canvas.height = Math.max(10, h);
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          reject(new Error('Canvas 2D context unavailable'));
+          return;
+        }
+        ctx.drawImage(img, 0, 0, w, h);
+        resolve(ctx.getImageData(0, 0, w, h));
+      };
+      img.onerror = () => reject(new Error('Failed to load image for vectorization'));
+      img.src = dataUri;
+    });
+  };
+
   const handleExecuteImport = async () => {
     setError(null);
     setIsProcessing(true);
 
     try {
+      // 1. Instant Algorithmic Client-Side Engine for Images
+      if (fileType === 'image' && vectorEngineMode === 'algorithmic' && filePreviewUri) {
+        setStatusMessage(`Processing algorithmic vector trace: ${selectedTechnique}...`);
+        const imgData = await extractImageDataFromDataUri(filePreviewUri);
+        const result = runVectorization(
+          imgData,
+          {
+            technique: selectedTechnique,
+            detailLevel,
+            invert: invertLuminance,
+            strokeColor: vectorColor,
+            fillColor: vectorColor,
+            backgroundColor: vectorBgColor,
+          },
+          selectedFile?.name || 'imported-vector'
+        );
+
+        setStatusMessage('Mathematical vectorization complete!');
+        setTimeout(() => {
+          setIsProcessing(false);
+          onArtworkImported(result.artwork);
+          onClose();
+        }, 200);
+        return;
+      }
+
       setStatusMessage(
         fileType === 'image'
           ? 'Scanning image composition & deconstructing geometry...'
@@ -438,69 +514,234 @@ export const ImportModal: React.FC<ImportModalProps> = ({
 
           {/* Vector Configuration Controls */}
           <div className="p-3.5 bg-[#121212] border border-[#333333] space-y-3">
-            <div className="flex items-center gap-1.5 text-xs font-bold text-[#FFFFFF] uppercase tracking-wider">
-              <Sliders className="w-3.5 h-3.5 text-[#00FF00]" />
-              <span>Vector Crafting Parameters</span>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5 text-xs font-bold text-[#FFFFFF] uppercase tracking-wider">
+                <Sliders className="w-3.5 h-3.5 text-[#00FF00]" />
+                <span>Vectorization Engine Pipeline</span>
+              </div>
+
+              {fileType === 'image' && (
+                <div className="flex items-center gap-1 bg-[#0A0A0A] p-0.5 border border-[#333333]">
+                  <button
+                    type="button"
+                    onClick={() => setVectorEngineMode('algorithmic')}
+                    className={`px-2 py-1 text-[10px] uppercase font-bold flex items-center gap-1 transition-colors ${
+                      vectorEngineMode === 'algorithmic'
+                        ? 'bg-[#00FF00] text-[#000000]'
+                        : 'text-[#888888] hover:text-[#FFFFFF]'
+                    }`}
+                  >
+                    <Zap className="w-3 h-3" />
+                    <span>Algorithmic Math (Instant)</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setVectorEngineMode('ai')}
+                    className={`px-2 py-1 text-[10px] uppercase font-bold flex items-center gap-1 transition-colors ${
+                      vectorEngineMode === 'ai'
+                        ? 'bg-[#00FFFF] text-[#000000]'
+                        : 'text-[#888888] hover:text-[#FFFFFF]'
+                    }`}
+                  >
+                    <Sparkles className="w-3 h-3" />
+                    <span>AI Architectural</span>
+                  </button>
+                </div>
+              )}
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
-              {/* Target Style */}
-              <div>
-                <label className="block text-[10px] text-[#888888] uppercase mb-1">
-                  Target Aesthetic Style
-                </label>
-                <select
-                  value={targetStyle}
-                  onChange={(e) => setTargetStyle(e.target.value)}
-                  className="w-full bg-[#1A1A1A] border border-[#333333] text-[#FFFFFF] px-2 py-1 outline-none text-xs"
-                >
-                  <option value="Modernist Geometric">Modernist Geometric</option>
-                  <option value="Technical HUD / Sci-Fi">Technical HUD / Sci-Fi</option>
-                  <option value="Cyberpunk Precision">Cyberpunk Precision</option>
-                  <option value="Bauhaus & Swiss Style">Bauhaus & Swiss Style</option>
-                  <option value="Art Deco Luxury">Art Deco Luxury</option>
-                  <option value="Japanese Editorial">Japanese Editorial</option>
-                  <option value="Parametric Generative">Parametric Generative</option>
-                  <option value="Clean Minimalist Iconography">Clean Minimalist Iconography</option>
-                </select>
-              </div>
+            {/* If Image and Algorithmic Engine Mode: Render 12 Vectorization Techniques */}
+            {fileType === 'image' && vectorEngineMode === 'algorithmic' ? (
+              <div className="space-y-3 pt-1">
+                {/* Technique Category Filter Pills */}
+                <div className="flex flex-wrap gap-1">
+                  {[
+                    { id: 'all', label: 'All 12 Engines' },
+                    { id: 'Contour & Line Art', label: 'Contour & Line' },
+                    { id: 'Color & Low-Poly', label: 'Color & Mesh' },
+                    { id: 'Pattern & Engraving', label: 'Engraving & Dither' },
+                    { id: 'Experimental & 3D', label: '3D & Matrix' },
+                  ].map((cat) => (
+                    <button
+                      key={cat.id}
+                      type="button"
+                      onClick={() => setTechniqueCategoryFilter(cat.id)}
+                      className={`px-2 py-0.5 text-[10px] uppercase font-mono border transition-colors ${
+                        techniqueCategoryFilter === cat.id
+                          ? 'bg-[#00FF00]/15 text-[#00FF00] border-[#00FF00]'
+                          : 'bg-[#181818] text-[#777777] border-[#2A2A2A] hover:text-[#FFFFFF]'
+                      }`}
+                    >
+                      {cat.label}
+                    </button>
+                  ))}
+                </div>
 
-              {/* Complexity */}
-              <div>
-                <label className="block text-[10px] text-[#888888] uppercase mb-1">
-                  Complexity Level
-                </label>
-                <select
-                  value={complexity}
-                  onChange={(e) => setComplexity(e.target.value as any)}
-                  className="w-full bg-[#1A1A1A] border border-[#333333] text-[#FFFFFF] px-2 py-1 outline-none text-xs"
-                >
-                  <option value="minimal">Minimal (Clean Silhouettes)</option>
-                  <option value="balanced">Balanced (Standard Masterpiece)</option>
-                  <option value="intricate">Intricate (Rich Sub-paths & Gradients)</option>
-                  <option value="ultra">Ultra Precision (Fine Telemetry)</option>
-                </select>
-              </div>
+                {/* Grid of Algorithms */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 max-h-[220px] overflow-y-auto custom-scrollbar p-0.5">
+                  {VECTORIZATION_TECHNIQUES.filter(
+                    (t) => techniqueCategoryFilter === 'all' || t.category === techniqueCategoryFilter
+                  ).map((tech) => {
+                    const isSelected = selectedTechnique === tech.id;
+                    return (
+                      <div
+                        key={tech.id}
+                        onClick={() => setSelectedTechnique(tech.id)}
+                        className={`p-2.5 border text-left cursor-pointer transition-all ${
+                          isSelected
+                            ? 'bg-[#00FF00]/10 border-[#00FF00] shadow-[0_0_10px_rgba(0,255,0,0.15)]'
+                            : 'bg-[#161616] border-[#282828] hover:border-[#444444] hover:bg-[#1A1A1A]'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2 mb-1">
+                          <div
+                            className={`w-6 h-6 rounded-sm flex items-center justify-center shrink-0 ${
+                              isSelected ? 'bg-[#00FF00] text-[#000000]' : 'bg-[#222222] text-[#888888]'
+                            }`}
+                          >
+                            {tech.id === 'centerline' ? <PenTool className="w-3.5 h-3.5" /> :
+                             tech.id === 'region' ? <Layers className="w-3.5 h-3.5" /> :
+                             tech.id === 'color-quantize' ? <Sparkles className="w-3.5 h-3.5" /> :
+                             tech.id === 'delaunay' ? <Zap className="w-3.5 h-3.5" /> :
+                             tech.id === 'halftone' ? <Radio className="w-3.5 h-3.5" /> :
+                             tech.id === 'voronoi-stipple' ? <Eye className="w-3.5 h-3.5" /> :
+                             tech.id === 'contour' ? <Waves className="w-3.5 h-3.5" /> :
+                             tech.id === 'cross-hatch' ? <Flame className="w-3.5 h-3.5" /> :
+                             tech.id === 'tsp-single-line' ? <Activity className="w-3.5 h-3.5" /> :
+                             tech.id === 'canny-blueprint' ? <Cpu className="w-3.5 h-3.5" /> :
+                             tech.id === 'isometric-voxel' ? <Sliders className="w-3.5 h-3.5" /> :
+                             <FileCode className="w-3.5 h-3.5" />}
+                          </div>
+                          <div className="min-w-0">
+                            <h4 className={`text-[11px] font-bold uppercase truncate ${isSelected ? 'text-[#00FF00]' : 'text-[#FFFFFF]'}`}>
+                              {tech.name}
+                            </h4>
+                            <p className="text-[9px] text-[#777777] truncate">{tech.tagline}</p>
+                          </div>
+                        </div>
+                        <p className="text-[10px] text-[#888888] line-clamp-2 leading-tight">
+                          {tech.description}
+                        </p>
+                      </div>
+                    );
+                  })}
+                </div>
 
-              {/* Palette Mood */}
-              <div>
-                <label className="block text-[10px] text-[#888888] uppercase mb-1">
-                  Palette Vibe
-                </label>
-                <select
-                  value={paletteMood}
-                  onChange={(e) => setPaletteMood(e.target.value)}
-                  className="w-full bg-[#1A1A1A] border border-[#333333] text-[#FFFFFF] px-2 py-1 outline-none text-xs"
-                >
-                  <option value="Harmonious Precision">Harmonious Precision</option>
-                  <option value="Electric Cyberpunk (Cyan/Neon/Magenta)">Electric Cyberpunk</option>
-                  <option value="Monochrome High-Contrast (Obsidian/White)">Monochrome High-Contrast</option>
-                  <option value="Bauhaus Primary (Red/Navy/Gold)">Bauhaus Primary</option>
-                  <option value="Earthen Editorial (Olive/Terracotta)">Earthen Editorial</option>
-                  <option value="Dark Obsidian HUD">Dark Obsidian HUD</option>
-                </select>
+                {/* Algorithmic Fine-Tuning Controls */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 border-t border-[#222222] text-xs">
+                  <div>
+                    <label className="block text-[10px] text-[#888888] uppercase mb-1">Detail Resolution</label>
+                    <select
+                      value={detailLevel}
+                      onChange={(e) => setDetailLevel(e.target.value as any)}
+                      className="w-full bg-[#1A1A1A] border border-[#333333] text-[#FFFFFF] px-2 py-1 outline-none text-xs"
+                    >
+                      <option value="low">Low (Simplified)</option>
+                      <option value="medium">Medium (Standard)</option>
+                      <option value="high">High (Maximum Fidelity)</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] text-[#888888] uppercase mb-1">Vector Color</label>
+                    <div className="flex items-center gap-1.5">
+                      <input
+                        type="color"
+                        value={vectorColor}
+                        onChange={(e) => setVectorColor(e.target.value)}
+                        className="w-6 h-6 border border-[#333333] bg-transparent cursor-pointer p-0"
+                      />
+                      <span className="text-[11px] text-[#AAAAAA] uppercase font-mono">{vectorColor}</span>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] text-[#888888] uppercase mb-1">Canvas Background</label>
+                    <div className="flex items-center gap-1.5">
+                      <input
+                        type="color"
+                        value={vectorBgColor}
+                        onChange={(e) => setVectorBgColor(e.target.value)}
+                        className="w-6 h-6 border border-[#333333] bg-transparent cursor-pointer p-0"
+                      />
+                      <span className="text-[11px] text-[#AAAAAA] uppercase font-mono">{vectorBgColor}</span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-end pb-1">
+                    <label className="flex items-center gap-1.5 cursor-pointer text-[11px] text-[#CCCCCC]">
+                      <input
+                        type="checkbox"
+                        checked={invertLuminance}
+                        onChange={(e) => setInvertLuminance(e.target.checked)}
+                        className="accent-[#00FF00]"
+                      />
+                      <span>Invert Contrast</span>
+                    </label>
+                  </div>
+                </div>
               </div>
-            </div>
+            ) : (
+              /* AI Architectural Vectorizer Controls */
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                {/* Target Style */}
+                <div>
+                  <label className="block text-[10px] text-[#888888] uppercase mb-1">
+                    Target Aesthetic Style
+                  </label>
+                  <select
+                    value={targetStyle}
+                    onChange={(e) => setTargetStyle(e.target.value)}
+                    className="w-full bg-[#1A1A1A] border border-[#333333] text-[#FFFFFF] px-2 py-1 outline-none text-xs"
+                  >
+                    <option value="Modernist Geometric">Modernist Geometric</option>
+                    <option value="Technical HUD / Sci-Fi">Technical HUD / Sci-Fi</option>
+                    <option value="Cyberpunk Precision">Cyberpunk Precision</option>
+                    <option value="Bauhaus & Swiss Style">Bauhaus & Swiss Style</option>
+                    <option value="Art Deco Luxury">Art Deco Luxury</option>
+                    <option value="Japanese Editorial">Japanese Editorial</option>
+                    <option value="Parametric Generative">Parametric Generative</option>
+                    <option value="Clean Minimalist Iconography">Clean Minimalist Iconography</option>
+                  </select>
+                </div>
+
+                {/* Complexity */}
+                <div>
+                  <label className="block text-[10px] text-[#888888] uppercase mb-1">
+                    Complexity Level
+                  </label>
+                  <select
+                    value={complexity}
+                    onChange={(e) => setComplexity(e.target.value as any)}
+                    className="w-full bg-[#1A1A1A] border border-[#333333] text-[#FFFFFF] px-2 py-1 outline-none text-xs"
+                  >
+                    <option value="minimal">Minimal (Clean Silhouettes)</option>
+                    <option value="balanced">Balanced (Standard Masterpiece)</option>
+                    <option value="intricate">Intricate (Rich Sub-paths & Gradients)</option>
+                    <option value="ultra">Ultra Precision (Fine Telemetry)</option>
+                  </select>
+                </div>
+
+                {/* Palette Mood */}
+                <div>
+                  <label className="block text-[10px] text-[#888888] uppercase mb-1">
+                    Palette Vibe
+                  </label>
+                  <select
+                    value={paletteMood}
+                    onChange={(e) => setPaletteMood(e.target.value)}
+                    className="w-full bg-[#1A1A1A] border border-[#333333] text-[#FFFFFF] px-2 py-1 outline-none text-xs"
+                  >
+                    <option value="Harmonious Precision">Harmonious Precision</option>
+                    <option value="Electric Cyberpunk (Cyan/Neon/Magenta)">Electric Cyberpunk</option>
+                    <option value="Monochrome High-Contrast (Obsidian/White)">Monochrome High-Contrast</option>
+                    <option value="Bauhaus Primary (Red/Navy/Gold)">Bauhaus Primary</option>
+                    <option value="Earthen Editorial (Olive/Terracotta)">Earthen Editorial</option>
+                    <option value="Dark Obsidian HUD">Dark Obsidian HUD</option>
+                  </select>
+                </div>
+              </div>
+            )}
 
             {/* Custom Notes */}
             <div>

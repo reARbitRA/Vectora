@@ -1,4 +1,5 @@
 import { AnimationConfig, AnimationLoopMode, AnimationPresetId, AnimationPresetMeta, AnimationSyncGroup, KeyframeNode, LayerAnimationConfig } from '../types';
+import { COMPLETE_ANIMATION_PRESETS, injectExtendedAnimation } from './animations';
 
 export const ANIMATION_EASINGS: { id: string; name: string; curve: string; category: string }[] = [
   { id: 'ease-in-out', name: 'Ease In Out (Smooth)', curve: 'ease-in-out', category: 'Standard' },
@@ -253,6 +254,18 @@ export const ANIMATION_PRESETS: (AnimationPresetMeta & { defaults?: AnimationPre
     },
     bestFor: 'Abstract fluids, biological shapes & soundwaves',
   },
+  ...COMPLETE_ANIMATION_PRESETS.map((p) => ({
+    ...p,
+    defaults: {
+      easing: 'ease-in-out',
+      loopMode: (p.id === 'pen-draw-on' || p.id === 'wipe-reveal' || p.id === 'typewriter' || p.id === 'signature-bleed' || p.id === 'iris-reveal' || p.id === 'assembling-puzzle' ? 'once' : 'infinite') as AnimationLoopMode,
+      duration: p.recommendedDuration,
+      speed: 1,
+      motionTrail: p.id === 'particle-trail',
+      motionTrailCount: 3,
+      motionTrailOpacity: 0.35,
+    },
+  })),
 ];
 
 export const DEFAULT_ANIMATION_CONFIG: AnimationConfig = {
@@ -291,6 +304,12 @@ export function removeSvgAnimations(svgString: string): string {
   try {
     const parser = new DOMParser();
     const doc = parser.parseFromString(svgString, 'image/svg+xml');
+    
+    const errorNode = doc.querySelector('parsererror');
+    if (errorNode) {
+      console.warn('SVG Parse Error in removeSvgAnimations:', errorNode.textContent);
+      return svgString;
+    }
     
     // Remove animation style tag
     const styleEl = doc.getElementById('vectora-animations');
@@ -355,10 +374,23 @@ export function injectSvgAnimations(
     return removeSvgAnimations(rawSvg);
   }
 
+  // Check if active preset belongs to the 25-technique extended animation engine
+  if (COMPLETE_ANIMATION_PRESETS.some((p) => p.id === config.preset)) {
+    const cleanSvg = removeSvgAnimations(rawSvg);
+    return injectExtendedAnimation(cleanSvg, config);
+  }
+
   try {
     const cleanSvg = removeSvgAnimations(rawSvg);
     const parser = new DOMParser();
     const doc = parser.parseFromString(cleanSvg, 'image/svg+xml');
+    
+    const errorNode = doc.querySelector('parsererror');
+    if (errorNode) {
+      console.warn('SVG Parse Error in injectSvgAnimations:', errorNode.textContent);
+      return rawSvg;
+    }
+
     const svgEl = doc.querySelector('svg');
     if (!svgEl) return rawSvg;
 
@@ -546,6 +578,10 @@ export function injectSvgAnimations(
       `.vec-orch-details { animation: vec-kf-spin-ccw ${baseDuration * 1.8}s var(--vec-easing) var(--vec-iteration) var(--vec-direction) !important; }`,
       `.vec-orch-text { animation: vec-kf-pulse-breath ${baseDuration * 1.1}s var(--vec-easing) var(--vec-iteration) var(--vec-direction) !important; }`,
       `.vec-orch-accents { animation: vec-kf-neon-flicker ${baseDuration * 0.7}s var(--vec-easing) var(--vec-iteration) var(--vec-direction) !important; }`,
+      `.vec-orch-hands { 
+         animation: vec-kf-spin-cw ${baseDuration * 3}s linear var(--vec-iteration) normal !important; 
+         transform-origin: center center !important;
+       }`,
       `.vec-orch-fx { animation: vec-kf-color-shimmer ${baseDuration * 1.6}s var(--vec-easing) var(--vec-iteration) var(--vec-direction) !important; }`,
       ``,
       `/* Animation Sync Groups (Linked Multi-Layer Parameters) */`,
@@ -659,6 +695,8 @@ export function injectSvgAnimations(
             animClass = 'vec-orch-text';
           } else if (label.includes('accent') || label.includes('highlight') || label.includes('glow') || index === 5) {
             animClass = 'vec-orch-accents';
+          } else if (label.includes('hand') || label.includes('indicator') || label.includes('needle') || label.includes('dial') || label.includes('aghrebe') || label.includes('pointer')) {
+            animClass = 'vec-orch-hands';
           } else if (label.includes('fx') || label.includes('overlay') || label.includes('scan') || index >= 6) {
             animClass = 'vec-orch-fx';
           }
@@ -813,8 +851,9 @@ export function getAnimClassForPreset(presetId: AnimationPresetId | 'none'): str
     case 'orchestrated-composite':
       return 'vec-orch-core';
     case 'none':
-    default:
       return '';
+    default:
+      return `vec-anim-${presetId}`;
   }
 }
 

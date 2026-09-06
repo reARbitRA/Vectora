@@ -76,7 +76,7 @@ export const AnimationStudio: React.FC<AnimationStudioProps> = ({
   }));
 
   const [activeSubTab, setActiveSubTab] = useState<'presets' | 'timeline' | 'sync' | 'code'>('presets');
-  const [presetCategoryFilter, setPresetCategoryFilter] = useState<'all' | 'Standard Essentials' | 'Kinetic & Dynamics' | 'Cybernetic & VFX'>('all');
+  const [presetCategoryFilter, setPresetCategoryFilter] = useState<string>('all');
   const [copiedCode, setCopiedCode] = useState(false);
   const [selectedLayerId, setSelectedLayerId] = useState<string | null>(null);
   const [isSynthesizing, setIsSynthesizing] = useState(false);
@@ -270,6 +270,7 @@ export const AnimationStudio: React.FC<AnimationStudioProps> = ({
       case 'ArrowDownUp': return <ArrowDownUp className={className} />;
       case 'PenTool': return <PenTool className={className} />;
       case 'RotateCw': return <RotateCw className={className} />;
+      case 'RotateCcw': return <RotateCcw className={className} />;
       case 'Heart': return <Heart className={className} />;
       case 'Radio': return <Radio className={className} />;
       case 'Wind': return <Wind className={className} />;
@@ -277,6 +278,13 @@ export const AnimationStudio: React.FC<AnimationStudioProps> = ({
       case 'Flame': return <Flame className={className} />;
       case 'Sun': return <Sun className={className} />;
       case 'Activity': return <Activity className={className} />;
+      case 'Layers': return <Layers className={className} />;
+      case 'Eye': return <Eye className={className} />;
+      case 'Waves': return <Waves className={className} />;
+      case 'Sliders': return <Sliders className={className} />;
+      case 'Cpu': return <Cpu className={className} />;
+      case 'Copy': return <Copy className={className} />;
+      case 'Maximize2': return <Maximize2 className={className} />;
       default: return <Film className={className} />;
     }
   };
@@ -316,11 +324,11 @@ export const AnimationStudio: React.FC<AnimationStudioProps> = ({
         </div>
 
         {/* Playback & Quick Action Controls */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 md:gap-2 overflow-x-auto no-scrollbar py-1">
           {/* Auto-Bake Toggle Button in Header */}
           <button
             onClick={() => handleUpdateConfig({ autoBake: !config.autoBake })}
-            className={`px-2.5 py-1.5 border text-xs font-mono uppercase flex items-center gap-1.5 transition-all ${
+            className={`px-2 md:px-2.5 py-1.5 border text-[11px] md:text-xs font-mono uppercase flex items-center gap-1 md:gap-1.5 transition-all shrink-0 ${
               config.autoBake
                 ? 'bg-[#00FFFF]/15 text-[#00FFFF] border-[#00FFFF] shadow-[0_0_10px_rgba(0,255,255,0.25)]'
                 : 'bg-[#141414] text-[#888888] border-[#333333] hover:text-[#FFFFFF]'
@@ -328,12 +336,12 @@ export const AnimationStudio: React.FC<AnimationStudioProps> = ({
             title="Automatically compiles and synchronizes animation CSS into canvas SVG state"
           >
             <Cpu className="w-3.5 h-3.5" />
-            <span className="hidden md:inline">Auto-Bake</span>
+            <span className="hidden sm:inline">Auto-Bake</span>
           </button>
 
           <button
             onClick={handleTogglePlay}
-            className={`px-3 py-1.5 border text-xs font-mono uppercase flex items-center gap-1.5 transition-all ${
+            className={`px-2.5 md:px-3 py-1.5 border text-[11px] md:text-xs font-mono uppercase flex items-center gap-1 md:gap-1.5 transition-all shrink-0 ${
               config.isPaused
                 ? 'bg-[#141414] text-[#CCCCCC] border-[#444444] hover:text-[#FFFFFF]'
                 : 'bg-[#00FF00] text-[#000000] border-[#00FF00] font-bold shadow-[0_0_10px_rgba(0,255,0,0.3)]'
@@ -356,10 +364,10 @@ export const AnimationStudio: React.FC<AnimationStudioProps> = ({
             onClick={handleSmartChoreograph}
             disabled={isSynthesizing}
             title="AI Smart Choreography"
-            className="px-3 py-1.5 bg-[#0D0D0D] border border-[#333333] hover:border-[#00FFFF] text-[#00FFFF] hover:bg-[#00FFFF]/10 text-xs uppercase flex items-center gap-1.5 transition-all disabled:opacity-50"
+            className="px-2.5 md:px-3 py-1.5 bg-[#0D0D0D] border border-[#333333] hover:border-[#00FFFF] text-[#00FFFF] hover:bg-[#00FFFF]/10 text-[11px] md:text-xs uppercase flex items-center gap-1 md:gap-1.5 transition-all disabled:opacity-50 shrink-0"
           >
             <Sparkles className={`w-3.5 h-3.5 ${isSynthesizing ? 'animate-spin' : ''}`} />
-            <span className="hidden sm:inline">Smart Choreograph</span>
+            <span className="hidden sm:inline">Choreograph</span>
           </button>
 
           {/* Render as GIF Button */}
@@ -367,39 +375,39 @@ export const AnimationStudio: React.FC<AnimationStudioProps> = ({
             onClick={handleRenderGif}
             disabled={isRenderingGif}
             title="Render and encode current SVG animation timeline into an animated GIF file"
-            className="px-3 py-1.5 bg-[#FF0055]/10 hover:bg-[#FF0055]/20 border border-[#FF0055]/50 text-[#FF3377] text-xs uppercase flex items-center gap-1.5 font-bold transition-all disabled:opacity-50"
+            className="px-2.5 md:px-3 py-1.5 bg-[#FF0055]/10 hover:bg-[#FF0055]/20 border border-[#FF0055]/50 text-[#FF3377] text-[11px] md:text-xs uppercase flex items-center gap-1 md:gap-1.5 font-bold transition-all disabled:opacity-50 shrink-0"
           >
             {isRenderingGif ? (
               <>
                 <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                <span>{gifProgress > 0 ? `Encoding ${gifProgress}%` : 'Rendering...'}</span>
+                <span>{gifProgress > 0 ? `${gifProgress}%` : 'GIF...'}</span>
               </>
             ) : (
               <>
                 <ImageIcon className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Render as GIF</span>
+                <span className="hidden md:inline">GIF</span>
               </>
             )}
           </button>
 
-          <div className="h-4 w-px bg-[#333333] mx-1" />
+          <div className="h-4 w-px bg-[#333333] mx-0.5 shrink-0" />
 
           <button
             onClick={handleBakeIntoArtwork}
             title="Bake animations into the current artwork"
-            className="px-3 py-1.5 bg-[#141414] hover:bg-[#1A1A1A] border border-[#444444] hover:border-[#00FF00] text-[#FFFFFF] text-xs uppercase flex items-center gap-1.5 transition-all"
+            className="px-2.5 md:px-3 py-1.5 bg-[#141414] hover:bg-[#1A1A1A] border border-[#444444] hover:border-[#00FF00] text-[#FFFFFF] text-[11px] md:text-xs uppercase flex items-center gap-1 md:gap-1.5 transition-all shrink-0"
           >
             <Save className="w-3.5 h-3.5 text-[#00FF00]" />
-            <span className="hidden md:inline">Bake to Canvas</span>
+            <span className="hidden lg:inline">Bake</span>
           </button>
 
           <button
             onClick={handleDownloadAnimatedSvg}
             title="Download animated standalone SVG"
-            className="px-3 py-1.5 bg-[#00FF00]/10 hover:bg-[#00FF00]/20 border border-[#00FF00]/50 text-[#00FF00] text-xs uppercase flex items-center gap-1.5 font-bold transition-all"
+            className="px-2.5 md:px-3 py-1.5 bg-[#00FF00]/10 hover:bg-[#00FF00]/20 border border-[#00FF00]/50 text-[#00FF00] text-[11px] md:text-xs uppercase flex items-center gap-1 md:gap-1.5 font-bold transition-all shrink-0"
           >
             <Download className="w-3.5 h-3.5" />
-            <span className="hidden lg:inline">Export Animated SVG</span>
+            <span className="hidden lg:inline">Export</span>
           </button>
         </div>
       </div>
@@ -407,7 +415,7 @@ export const AnimationStudio: React.FC<AnimationStudioProps> = ({
       {/* Main Workspace Split: Left Interactive Canvas, Right Motion Controls */}
       <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
         {/* Left Side: Live Dynamic Viewport */}
-        <div className="flex-1 flex flex-col bg-[#050505] border-r border-[#222222] relative overflow-hidden">
+        <div className="flex-1 flex flex-col bg-[#050505] border-r border-[#222222] relative overflow-hidden min-h-[260px]">
           {/* Viewport Top Bar Status */}
           <div className="h-9 bg-[#0A0A0A]/90 border-b border-[#222222] px-4 flex items-center justify-between text-[11px] text-[#777777] z-10 backdrop-blur-sm">
             <div className="flex items-center gap-3">
@@ -514,7 +522,7 @@ export const AnimationStudio: React.FC<AnimationStudioProps> = ({
         </div>
 
         {/* Right Side: Motion Control Panel */}
-        <div className="w-full lg:w-96 xl:w-[440px] bg-[#0D0D0D] flex flex-col shrink-0 overflow-hidden">
+        <div className="w-full h-[45vh] lg:h-full lg:w-96 xl:w-[440px] bg-[#0D0D0D] flex flex-col shrink-0 overflow-hidden border-t lg:border-t-0 lg:border-l border-[#222222]">
           {/* Sub-Tabs Selector */}
           <div className="h-11 bg-[#0A0A0A] border-b border-[#222222] px-3 flex items-center gap-1 shrink-0">
             <button
@@ -584,13 +592,17 @@ export const AnimationStudio: React.FC<AnimationStudioProps> = ({
               <div className="flex flex-wrap gap-1">
                 {[
                   { id: 'all', label: 'All' },
+                  { id: 'Reveal & Draw', label: 'Reveal & Draw' },
+                  { id: 'Morph & Transform', label: 'Morph & Warp' },
+                  { id: 'Particle & Emission', label: 'Particles' },
+                  { id: 'Color & Gradient', label: 'Color & Glitch' },
+                  { id: 'Kinetic & Physics', label: 'Kinetic & Physics' },
+                  { id: 'Advanced Cinematic', label: 'Cinematic' },
                   { id: 'Standard Essentials', label: 'Essentials' },
-                  { id: 'Kinetic & Dynamics', label: 'Kinetic' },
-                  { id: 'Cybernetic & VFX', label: 'Cyber & VFX' },
                 ].map((cat) => (
                   <button
                     key={cat.id}
-                    onClick={() => setPresetCategoryFilter(cat.id as any)}
+                    onClick={() => setPresetCategoryFilter(cat.id)}
                     className={`px-2 py-1 text-[10px] uppercase font-mono border transition-colors ${
                       presetCategoryFilter === cat.id
                         ? 'bg-[#00FF00]/15 text-[#00FF00] border-[#00FF00]'
@@ -650,6 +662,13 @@ export const AnimationStudio: React.FC<AnimationStudioProps> = ({
                       <p className="mt-2 text-[11px] text-[#999999] leading-relaxed">
                         {preset.description}
                       </p>
+
+                      {(preset as any).trick && (
+                        <div className="mt-2 px-2 py-1 bg-[#00FFFF]/5 border border-[#00FFFF]/20 text-[10px] text-[#00FFFF] flex items-center gap-1.5">
+                          <Zap className="w-3 h-3 text-[#00FFFF] shrink-0" />
+                          <span className="font-mono">Trick: {(preset as any).trick}</span>
+                        </div>
+                      )}
 
                       <div className="mt-2 pt-2 border-t border-[#222222] flex items-center justify-between text-[10px] text-[#666666]">
                         <span>Best for: <strong className="text-[#AAAAAA]">{preset.bestFor}</strong></span>

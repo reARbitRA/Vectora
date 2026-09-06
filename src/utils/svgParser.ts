@@ -5,6 +5,14 @@ export function parseSvgLayers(svgString: string): LayerSpec[] {
   try {
     const parser = new DOMParser();
     const doc = parser.parseFromString(svgString, 'image/svg+xml');
+    
+    // Check for parser errors
+    const errorNode = doc.querySelector('parsererror');
+    if (errorNode) {
+      console.warn('SVG Parse Error in parseSvgLayers:', errorNode.textContent);
+      return [];
+    }
+
     const layers: LayerSpec[] = [];
 
     // Find all <g> elements with inkscape:groupmode="layer" or inkscape:label or id starting with layer
@@ -75,6 +83,13 @@ export function parseSvgHierarchy(svgString: string): LayerHierarchyNode[] {
   try {
     const parser = new DOMParser();
     const doc = parser.parseFromString(svgString, 'image/svg+xml');
+    
+    const errorNode = doc.querySelector('parsererror');
+    if (errorNode) {
+      console.warn('SVG Parse Error in parseSvgHierarchy:', errorNode.textContent);
+      return [];
+    }
+
     const rootSvg = doc.querySelector('svg');
     if (!rootSvg) return [];
 

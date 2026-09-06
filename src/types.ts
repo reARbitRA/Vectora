@@ -115,7 +115,32 @@ export type AnimationPresetId =
   | 'glitch-surge'
   | 'color-shimmer'
   | 'neon-flicker'
-  | 'wave-oscillate';
+  | 'wave-oscillate'
+  // Tier 1 & Comprehensive Animation Suite
+  | 'pen-draw-on'
+  | 'typewriter'
+  | 'wipe-reveal'
+  | 'signature-bleed'
+  | 'iris-reveal'
+  | 'path-morph'
+  | 'skeleton-rig'
+  | 'path-warp'
+  | 'elastic-bounce'
+  | 'particle-trail'
+  | 'constellation-draw'
+  | 'firefly-particles'
+  | 'gradient-flow'
+  | 'hue-rotation'
+  | 'chromatic-aberration'
+  | 'follow-path'
+  | 'wave-distortion'
+  | 'pendulum-swing'
+  | 'domino-cascade'
+  | 'parallax-depth'
+  | 'camera-dolly'
+  | 'lightning-strike'
+  | 'assembling-puzzle'
+  | 'liquid-fill';
 
 export type AnimationLoopMode = 'infinite' | 'once' | 'alternate';
 
