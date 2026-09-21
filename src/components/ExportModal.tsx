@@ -1,3 +1,4 @@
+import { SafeSvg } from './SafeSvg';
 import React, { useState, useEffect, useMemo } from 'react';
 import { toast } from 'sonner';
 import { ExportPreset, VectorArtwork } from '../types';
@@ -603,15 +604,13 @@ export const ExportModal: React.FC<ExportModalProps> = ({
                   </div>
 
                   <div className="w-40 h-40 border border-[#333333] flex items-center justify-center relative overflow-hidden bg-[#000000]">
-                    <div
+                    <SafeSvg
                       className="w-full h-full flex items-center justify-center pointer-events-none"
                       style={{
                         transform: `scale(${160 / spriteFrameSize})`,
                         transformOrigin: 'center center',
                       }}
-                      dangerouslySetInnerHTML={{
-                        __html: spriteSheetResult.frames[activePreviewFrame]?.svgContent || artwork.svg,
-                      }}
+                      svg={spriteSheetResult.frames[activePreviewFrame]?.svgContent || artwork.svg}
                     />
                   </div>
 

@@ -15,20 +15,29 @@
 / (workspace-root)
 ├── .env.example                     # Environment variables schema and template
 ├── .gitignore                       # Git ignore declarations for build outputs & secrets
+├── .github/                         # CI quality gate (typecheck, tests, build)
+│   └── workflows/ci.yml             # GitHub Actions pipeline for pushes & pull requests
 ├── AGENTS.md                        # Persistent agent instructions and maintenance rules
 ├── VERIFICATION_REPORT.md           # System verification, stress-test audit & diagnostic logs
 ├── bun.lock                         # Bun runtime lockfile
 ├── index.html                       # HTML application entry point & Google Fonts loading
 ├── metadata.json                    # Application metadata, permissions & capabilities
-├── package.json                     # Project manifest, npm dependencies & build scripts
-├── server.ts                        # Express backend, Vite dev middleware & AI model orchestrator
+├── package.json                     # Project manifest (vectora), npm dependencies & build scripts
+├── README.md                        # Honest project overview, setup & status summary
+├── server.ts                        # Express backend entry, routes & AI model orchestrator
+├── server/                          # Server modules (Phase 0 stabilization split)
+│   ├── config.ts                    # Env-driven configuration (PORT, limits, rate budgets, TTLs)
+│   ├── ai/contracts.ts              # Runtime validation of AI JSON responses (schema + bounds)
+│   └── security/                    # svgGuard, rateLimit, oauthState, sessions modules
 ├── tsconfig.json                    # TypeScript compiler configuration & path definitions
 ├── verify_system.ts                 # Automated end-to-end backend verification script
 ├── vite.config.ts                   # Vite bundler configuration & Tailwind integration
+├── vitest.config.ts                 # Test runner configuration (node + jsdom environments)
 │
 ├── docs/                            # Technical reports & system architecture documentation
 │   ├── APP_REPORT.md                # Comprehensive feature matrix & application report
 │   ├── ARCHITECTURE_REPORT.md       # High-level architecture, SVG standards & engine specs
+│   ├── AUDIT.md                     # Verified repository audit, feature status matrix & roadmap
 │   └── FILE_TREE.md                 # Living project file tree & directory documentation (this file)
 │
 ├── public/                          # Static web assets served directly by Vite/Express
@@ -67,8 +76,23 @@
     │   ├── PluginGallery.tsx        # Extensible vector filters & generative effects showcase
     │   ├── RefinePromptBar.tsx      # Natural language conversational refinement prompt bar
     │   ├── ReusableComponentShowcase.tsx # Library of modular UI icons, dials & HUD symbols
+    │   ├── SafeSvg.tsx              # Sanitized SVG renderer — the only sanctioned inline-SVG path
     │   ├── StudioCanvas.tsx         # Pan/zoom vector artboard with Cartesian/Polar grids
-    │   └── UnifiedStudio.tsx        # Integrated master workstation unifying all studio panels
+    │   └── UnifiedStudio.tsx        # Integrated master workstation (canonical document + command history)
+    │
+    ├── document/                     # Canonical document engine (Phase 1) — the editing source of truth
+    │   ├── types.ts                  # VectorDocument, PageNode, Element/Text/Comment nodes, schema version
+    │   ├── ids.ts                    # Stable node uid generation
+    │   ├── tree.ts                   # Immutable tree operations (path copying, no-op identity)
+    │   ├── importer.ts               # SVG → document adapter (uid reuse, semantic equality, whitespace policy)
+    │   ├── exporter.ts               # Document → canonical pretty-printed SVG adapter
+    │   ├── selectors.ts              # Document → LayerSpec[] derivation
+    │   ├── commands.ts               # Command-based mutations (attr, reorder, add/remove, replace, palette)
+    │   ├── history.ts                # Transactional undo/redo with coalescing
+    │   ├── migrations.ts             # Schema version migration chain
+    │   ├── persistence.ts            # IndexedDB store + debounced autosaver
+    │   ├── index.ts                  # Public surface of the document engine
+    │   └── __tests__/                # 66 unit tests: round-trips, commands, history, persistence, selectors
     │
     ├── data/                        # Static datasets, preset themes & vector libraries
     │   ├── masterpieces.ts          # Curated SVG masterpieces with pre-parsed layers & palettes
@@ -84,8 +108,10 @@
         │   └── index.ts             # Master animation preset registry & procedural SVG injector
         ├── gifRenderer.ts           # HTML5 Canvas frame-by-frame animated GIF exporter
         ├── spriteSheetRenderer.ts   # Multi-row vector animation sprite sheet generator
+        ├── sanitizeSvg.ts           # DOM-based SVG sanitizer (authoritative render gate)
         ├── svgAnimator.ts           # Kinetic SVG animation injection & CSS keyframe engine
         ├── svgParser.ts             # Semantic SVG DOM parser, layer extractor & node counter
+        ├── __tests__/               # Sanitizer XSS-vector & layer-persistence regression suites
         └── vectorization/           # 12-engine client-side raster-to-SVG vectorization suite
             ├── asciiMatrixTracer.ts     # Monospace ASCII terminal matrix vector renderer
             ├── cannyLineTracer.ts       # Canny edge detector & architectural blueprint tracer
@@ -110,13 +136,13 @@
 
 | File / Path | Role & Technology | Key Responsibilities |
 | :--- | :--- | :--- |
-| **`server.ts`** | Backend Entry (Express + Vite + TypeScript) | Serves the REST API on port `3000`, mounts Vite dev middleware, defines `/api/generate-svg`, `/api/refine-svg`, `/api/animate-svg`, and orchestrates multi-model rotation pool with retry/exponential backoff. |
-| **`package.json`** | Manifest & Scripts (npm) | Defines runtime packages (`@google/genai`, `motion`, `lucide-react`, `sonner`, `canvas-confetti`, `express`) and build scripts (`dev`, `build`, `start`, `lint`). |
+| **`server.ts`** | Backend Entry (Express + Vite + TypeScript) | Serves the REST API on `process.env.PORT` (fallback 3000), mounts Vite dev middleware, defines `/api/generate-svg`, `/api/refine-svg`, `/api/animate-svg`, `/api/import-vectorize`, `/api/generate-unified`, GitHub OAuth/sync routes, and orchestrates the multi-model pool with retry/backoff. Security modules, runtime AI contracts, and configuration live in **`server/`** (`config.ts`, `security/rateLimit.ts`, `security/oauthState.ts`, `security/sessions.ts`, `security/svgGuard.ts`, `ai/contracts.ts`) with unit tests under `server/**/__tests__/`. |
+| **`package.json`** | Manifest & Scripts (npm) | Package `vectora`; defines runtime packages (`@google/genai`, `motion`, `lucide-react`, `sonner`, `express`) and scripts (`dev`, `build`, `start`, `lint`, `test`, `test:watch`). |
 | **`tsconfig.json`** | TypeScript Configuration | Strict type-checking rules, modern ES modules target, JSX processing (`react-jsx`), and module resolution paths. |
 | **`vite.config.ts`** | Bundler & Dev Config | Configures Vite development server, binds port `3000`, and attaches `@tailwindcss/vite` plugin. |
 | **`metadata.json`** | Platform App Identity | Sets application name (*VECTORA — Generative SVG Design Studio*), capabilities (`MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API`), and permissions. |
 | **`index.html`** | Web Entry Point | Served to the browser; loads web fonts (JetBrains Mono, Inter, Plus Jakarta Sans), sets responsive viewport, and mounts `#root`. |
-| **`.env.example`** | Environment Contract | Defines required keys (`PORT`, `GEMINI_API_KEY`) without committing actual credentials. |
+| **`.env.example`** | Environment Contract | Documents `GEMINI_API_KEY`, `APP_URL`, `PORT`, GitHub OAuth keys, and all security/capacity limits (body size, SVG budgets, rate limits, TTLs) without committing credentials. |
 | **`verify_system.ts`** | Diagnostic Suite | Standalone test runner that queries all server endpoints with cooldown pacing to verify API integrity and quota status. |
 | **`AGENTS.md`** | Agent Rules & Conventions | Persistent instructions enforcing continuous updates to `/docs/FILE_TREE.md` whenever new files are created or altered. |
 
@@ -137,7 +163,7 @@
 
 | File / Path | Purpose & Functionality |
 | :--- | :--- |
-| **`src/main.tsx`** | Initializes React 18 createRoot, attaches the root component to `#root`, and applies strict mode. |
+| **`src/main.tsx`** | Initializes React 19 createRoot, attaches the root component to `#root`, and applies strict mode. |
 | **`src/App.tsx`** | Master application coordinator. Manages top-level routing between views (`home`, `studio`, `animation`, `gallery`), handles generation flows, tracks current artwork, and hosts global toasts (`Toaster`). |
 | **`src/index.css`** | Global stylesheet defining Tailwind CSS imports, custom scrollbar styling, grid background patterns, and monospace typography utility classes. |
 | **`src/types.ts`** | Central TypeScript definitions including `VectorArtwork`, `SvgLayer`, `ColorPalette`, `ParametricSettings`, `KineticAnimation`, `StudioLayout`, and export options. |
@@ -148,14 +174,14 @@
 
 | Component | Responsibility |
 | :--- | :--- |
-| **`UnifiedStudio.tsx`** | Central workstation integrating the interactive artboard, layer hierarchy, parametric drawer, code view, animation preview, and refinement bar into a unified workspace. |
+| **`UnifiedStudio.tsx`** | Central workstation integrating the interactive artboard, layer hierarchy, parametric drawer, code view, animation preview, and refinement bar. Owns the canonical `VectorDocument` + command history; all views derive from it (Phase 1). |
 | **`StudioCanvas.tsx`** | Vector canvas viewport with transform matrix pan and zoom, mouse-wheel zoom, coordinate crosshair readout, aspect ratio framing, and switchable Cartesian / Polar / Isometric drafting grids. |
 | **`CommandPalette.tsx`** | Global spotlight command palette (Cmd/Ctrl+K) for workspace navigation, quick prompt synthesis, direct SVG/PNG export, and shortcut reference. |
 | **`KeyboardShortcutsModal.tsx`** | Visual modal displaying keybindings for navigation (Ctrl+1/2/3), generation (Ctrl+N), export (Ctrl+Shift+S/P), and editing tools. |
 | **`LayerPanel.tsx`** | Tree-like AST layer viewer. Supports recursive sub-group inspection, layer visibility toggling, locking, solo/isolate mode, drag reordering, inline renaming, and CSS blend-mode selection. |
 | **`ParametricPanel.tsx`** | Real-time parametric tuning controls for stroke width multipliers, procedural SVG filter grain synthesis, and neon specular glow sliders. |
 | **`PaletteManager.tsx`** | Palette extraction, color harmonic remapping, swatch inspector, and live SVG fill/stroke replacement across preset themes. |
-| **`CodeEditor.tsx`** | In-browser SVG XML code editor with syntax formatting, node counter, error detection, and bidirectional canvas synchronization. |
+| **`CodeEditor.tsx`** | In-browser SVG XML code editor with syntax formatting, node counter, error detection, and bidirectional document synchronization (semantic change detection + echo suppression). |
 | **`DesignSpecPanel.tsx`** | Engineering metrics HUD displaying viewBox parameters, total elements, path count, memory footprint, and gradient definitions. |
 | **`KeyframeTimeline.tsx`** | Kinetic animation timeline featuring a playhead scrubber, time markers, playback speed multipliers (0.5x to 2x), and loop controls. |
 | **`AnimationStudio.tsx`** | Dedicated motion graphics view for designing, testing, and previewing CSS/SMIL kinetic animations on SVG paths. |
@@ -176,6 +202,23 @@
 | **`MainLayout.tsx`** | Responsive structural wrapper orchestrating drawer positioning, sidebar collapse states, and viewport containment. |
 
 ---
+
+### 2.4b Canonical Document Engine (`/src/document`) — Phase 1
+
+The authoritative editing model. SVG strings are inputs/outputs here, never the editing state.
+
+| File / Path | Role & Responsibility |
+| :--- | :--- |
+| **`src/document/types.ts`** | Defines `VectorDocument`, `PageNode`, and the `VectorNode` union (`ElementNode`/`TextNode`/`CommentNode`) with namespaced attribute preservation and the schema version constant. |
+| **`src/document/tree.ts`** | Immutable tree operations (find/update/insert/remove/move) with structural path sharing; identity-preserving no-ops let the history manager skip empty transactions. |
+| **`src/document/importer.ts`** | SVG → document adapter: stable uid assignment, uid reuse by element id across re-imports (AI refinement, code edits), insignificant-whitespace policy, `svgSemanticallyEqual` cosmetic-change detection. |
+| **`src/document/exporter.ts`** | Document → canonical, pretty-printed SVG serialization with namespace-correct attributes and verbatim text content. |
+| **`src/document/commands.ts`** | The command set: `SetNodeAttr`, `SetNodeText`, `AddNode`, `RemoveNode`, `ReorderNode`, `ReplaceDocument`, `ApplyPalette`, plus factories for rename/blend/new-layer — each captures its precise inverse during apply. |
+| **`src/document/history.ts`** | Transactional undo/redo manager: one apply = one undo step, no-op skipping, coalescing of rapid source edits into a single entry. |
+| **`src/document/selectors.ts`** | Derives `LayerSpec[]` (visibility, lock, blend, element counts) directly from document attributes. |
+| **`src/document/migrations.ts`** | Ordered schema-version migration chain (v0→v1) with loud rejection of future versions. |
+| **`src/document/persistence.ts`** | IndexedDB document store and debounced autosaver used by the studio for crash recovery. |
+| **`src/document/__tests__/`** | 66 unit tests covering import/export round-trips (namespaces, SMIL, styles, comments), command apply/undo, history semantics, persistence, and migrations. |
 
 ### 2.5 Static Datasets & Palettes (`/src/data`)
 

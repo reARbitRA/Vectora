@@ -1,3 +1,4 @@
+import { SafeSvg } from './SafeSvg';
 import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
@@ -466,9 +467,9 @@ export const AnimationStudio: React.FC<AnimationStudioProps> = ({
             <div
               className="w-full max-w-[560px] aspect-square flex items-center justify-center relative shadow-[0_0_50px_rgba(0,0,0,0.8)] border border-[#222222] bg-[#0A0A0A] p-2"
             >
-              <div
+              <SafeSvg
                 className="w-full h-full flex items-center justify-center [&>svg]:w-full [&>svg]:h-full [&>svg]:max-h-full"
-                dangerouslySetInnerHTML={{ __html: animatedSvg }}
+                svg={animatedSvg}
               />
 
               {/* GIF Encoding Overlay Indicator */}

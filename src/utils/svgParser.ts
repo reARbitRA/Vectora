@@ -1,5 +1,18 @@
 import { LayerSpec, LayerHierarchyNode, PaletteColor, SvgMetrics } from '../types';
 
+/**
+ * Inkscape layer attributes are namespaced. Setting them via plain
+ * `setAttribute('inkscape:label', …)` is invalid on programmatically created
+ * elements (throws InvalidStateError in some environments — including the
+ * previous silent failure in addNewSvgLayer) and is not namespace-correct
+ * in any environment. Always use these helpers.
+ */
+const INKSCAPE_NS = "http://www.inkscape.org/namespaces/inkscape";
+
+function setInkscapeAttr(el: Element, qualifiedName: 'inkscape:groupmode' | 'inkscape:label', value: string): void {
+  el.setAttributeNS(INKSCAPE_NS, qualifiedName, value);
+}
+
 export function parseSvgLayers(svgString: string): LayerSpec[] {
   if (!svgString) return [];
   try {
@@ -259,10 +272,10 @@ export function renameSvgLayer(svgString: string, oldName: string, newName: stri
         g.id === oldName ||
         g.id === oldName.toLowerCase().replace(/_/g, '-')
       ) {
-        g.setAttribute('inkscape:label', newName);
-        g.setAttribute('inkscape:groupmode', 'layer');
+        setInkscapeAttr(g, 'inkscape:label', newName);
+        setInkscapeAttr(g, 'inkscape:groupmode', 'layer');
         if (g.id) {
-          g.id = newName.toLowerCase().replace(/[^a-z0-9_-]/g, '-');
+          g.id = newName.toLowerCase().replace(/[^a-z0-9_-]+/g, '-');
         }
         matched = true;
       }
@@ -463,9 +476,9 @@ export function addNewSvgLayer(svgString: string, layerName: string, position: '
     if (!rootSvg) return svgString;
 
     const newGroup = doc.createElementNS('http://www.w3.org/2000/svg', 'g');
-    newGroup.setAttribute('inkscape:groupmode', 'layer');
-    newGroup.setAttribute('inkscape:label', layerName);
-    newGroup.setAttribute('id', layerName.toLowerCase().replace(/[^a-z0-9_-]/g, '-'));
+    setInkscapeAttr(newGroup, 'inkscape:groupmode', 'layer');
+    setInkscapeAttr(newGroup, 'inkscape:label', layerName);
+    newGroup.setAttribute('id', layerName.toLowerCase().replace(/[^a-z0-9_-]+/g, '-'));
 
     if (position === 'top') {
       rootSvg.appendChild(newGroup);
@@ -530,9 +543,9 @@ export function standardizeSvgLayers(svgString: string): string {
       const category = standardCategories[index % standardCategories.length];
       const newLabel = stripped.length > 2 ? `${prefix}_${stripped}` : `${prefix}_${category}`;
 
-      g.setAttribute('inkscape:groupmode', 'layer');
-      g.setAttribute('inkscape:label', newLabel);
-      g.id = newLabel.toLowerCase().replace(/[^a-z0-9_-]/g, '-');
+      setInkscapeAttr(g, 'inkscape:groupmode', 'layer');
+      setInkscapeAttr(g, 'inkscape:label', newLabel);
+      g.id = newLabel.toLowerCase().replace(/[^a-z0-9_-]+/g, '-');
     });
 
     return rootSvg.outerHTML;

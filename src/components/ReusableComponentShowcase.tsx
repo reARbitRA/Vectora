@@ -1,3 +1,4 @@
+import { SafeSvg } from './SafeSvg';
 import React, { useState } from 'react';
 import { ReusableSvgComponent } from '../types';
 import { REUSABLE_SVG_COMPONENTS } from '../data/reusableComponents';
@@ -143,10 +144,7 @@ export const ReusableComponentShowcase: React.FC<ReusableComponentShowcaseProps>
             className="w-full h-48 md:h-56 bg-[#000000] border border-[#222222] p-4 flex items-center justify-center relative overflow-hidden"
             style={{ [':root' as any]: styleString }}
           >
-            <div
-              className="w-full h-full"
-              dangerouslySetInnerHTML={{ __html: selectedComp.previewSvg }}
-            />
+            <SafeSvg className="w-full h-full" svg={selectedComp.previewSvg} />
           </div>
 
           {/* CSS Variable Real-Time Tuning Controls */}
