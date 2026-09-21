@@ -9,7 +9,8 @@
 ## What it does
 
 - **AI vector synthesis** — text, image, and document prompts → layered, semantic SVG (Gemini via `@google/genai`)
-- **Studio canvas** — pan/zoom artboard, layer panel (visibility / lock / rename / reorder / blend, all persisted into the document and undoable), code editor, palettes, animation studio, plugin gallery
+- **Studio canvas** — pan/zoom artboard, layer panel (visibility / lock / rename / reorder / blend — command-based and undoable), bidirectional code editor, palettes, animation studio, plugin gallery
+- **Canonical document engine** — edits target a typed, immutable scene graph (`src/document/`) with stable node ids, transactional command history (undo/redo across every mutation source), and IndexedDB autosave with crash recovery; SVG is an import/export format, not the editing state
 - **14 client-side vectorization engines** — centerline tracing, color quantization, Delaunay, Voronoi stippling, halftone, Canny blueprints, and more (experimental, artistic rather than faithful tracing)
 - **Animation** — SMIL/CSS keyframe injection, GIF and sprite-sheet export (experimental)
 - **Exports** — SVG, PNG (browser-canvas raster), React component, CSS data URI, sprite sheets
@@ -27,7 +28,7 @@ npm run dev                # http://localhost:3000
 |---|---|
 | `npm run dev` | Express + Vite dev server |
 | `npm run lint` | `tsc --noEmit` typecheck |
-| `npm test` | Vitest unit + integration suite (81 tests) |
+| `npm test` | Vitest unit + integration suite (147 tests) |
 | `npm run build` | Client bundle + server bundle (`dist/`) |
 | `npm start` | Run the built server (`PORT` env respected) |
 
@@ -48,8 +49,9 @@ See [`docs/FILE_TREE.md`](docs/FILE_TREE.md) for the complete living file map. H
 ```text
 server.ts               Express entry: routes + AI orchestration
 server/                 config, security (rate limit, OAuth state, sessions, SVG guard), AI contracts
-src/components/         Studio UI (UnifiedStudio, LayerPanel, StudioCanvas, SafeSvg, …)
-src/utils/svgParser.ts  DOM layer utilities (visibility/lock/rename/reorder persistence)
+src/document/           Canonical document engine: types, immutable tree, SVG adapters,
+                        commands, transactional history, migrations, IndexedDB persistence
+src/components/         Studio UI (UnifiedStudio, LayerPanel, StudioCanvas, CodeEditor, SafeSvg, …)
 src/utils/sanitizeSvg.ts  Authoritative browser-side SVG sanitizer
 src/utils/vectorization/ Client-side tracing engines
 docs/AUDIT.md           Verified audit, feature status matrix, roadmap
@@ -59,7 +61,7 @@ docs/AUDIT.md           Verified audit, feature status matrix, roadmap
 
 The editing core is the priority — not more presets:
 
-1. **Canonical document engine** — typed scene graph, stable node IDs, command-based undo/redo, IndexedDB persistence
+1. ~~Canonical document engine~~ ✅ shipped (typed scene graph, stable node IDs, command-based undo/redo, IndexedDB persistence)
 2. **Editing kernel** — selection, transforms, shape/pen/node tools, snapping, alignment
 3. **AI as a safe editing agent** — validated operation plans instead of whole-document replacement
 4. **Evaluation harness** — SVG validity, visual diffing, accessibility and determinism scoring

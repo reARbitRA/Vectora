@@ -1,7 +1,7 @@
 # VECTORA — Repository Audit & Stabilization Report
 
-> **Date:** 2026-09-21
-> **Scope:** Full repository audit (Phase 0 of the elevation program), followed by implementation of the truth-and-stabilization fixes.
+> **Date:** 2026-09-21 (updated same day after Phase 1)
+> **Scope:** Full repository audit (Phase 0 of the elevation program), followed by implementation of the truth-and-stabilization fixes, then the Phase 1 canonical document engine (§4.1).
 > **Method:** Every finding below was verified against the actual source before being recorded. Nothing is claimed from component or button presence alone.
 
 ---
@@ -134,6 +134,49 @@ These match the strategic assessment: no selection model, no direct geometry man
 
 ---
 
+## 4.1 Phase 1 — Canonical document engine (implemented)
+
+**Objective achieved: SVG is no longer the primary editing state.** The studio now edits a typed, immutable `VectorDocument`; SVG is an import/export format produced by adapters.
+
+### Architecture (`src/document/`)
+
+| Module | Responsibility |
+|---|---|
+| `types.ts` | `VectorDocument`, `PageNode`, `ElementNode`/`TextNode`/`CommentNode`, schema version |
+| `ids.ts` | Stable node uid generation (element ids stay in `attrs` — they are reference targets, not identity) |
+| `tree.ts` | Immutable tree ops with path copying; no-op mutations return the SAME instance (identity check drives history) |
+| `importer.ts` | SVG → document adapter; preserves namespaces, comments, `<style>`/text content; skips insignificant inter-element whitespace; uid reuse by element id across re-imports; `svgSemanticallyEqual` for cosmetic-change detection |
+| `exporter.ts` | Document → canonical pretty-printed SVG (namespaced attrs via `setAttributeNS`, verbatim text in `<text>`/`<style>`) |
+| `commands.ts` | `SetNodeAttr`, `SetNodeText`, `AddNode`, `RemoveNode`, `ReorderNode`, `ReplaceDocument`, `ApplyPalette` + factories (rename, blend mode, new layer) — each captures its precise inverse on apply |
+| `history.ts` | Transactional undo/redo: one `apply(commands, {label})` = one undo step; no-ops skipped; consecutive source edits coalesce (one undo per typing burst) |
+| `migrations.ts` | Ordered schema-version chain (v0→v1 registered; future versions rejected loudly) |
+| `persistence.ts` | IndexedDB store + debounced autosaver; loads pass through migrations |
+| `selectors.ts` | Document → `LayerSpec[]` derivation (visibility/lock/blend read from document attrs, not SVG re-parsing) |
+
+### Integration (`UnifiedStudio`, `CodeEditor`)
+
+- `UnifiedStudio` holds the `HistoryManager` + document as the single source of truth; `layers` and the exported SVG are **derived views**. The canvas, layer panel, palette manager, code editor, exporters, GitHub sync, and share all read the same document (directly or via its serialization).
+- Every layer operation (visibility, lock, rename, solo, show-all, reorder, add, blend) and palette application is now a **command transaction** — undoable, with precise inverse (not string snapshots).
+- Code editor and animation studio changes import into the document (uid-preserving) as a single `ReplaceDocumentCommand`; **cosmetic-only edits are detected semantically and skipped** (they no longer dirty the document or history); typing bursts coalesce into one undo step. The code editor suppresses echo-sync so the canonical serialization never clobbers the user's mid-typing text.
+- AI refinement likewise imports into the document and applies as one undoable command; model-reported layer lists are no longer trusted (layers are document-derived).
+- **IndexedDB autosave** on every mutation (800 ms debounce, flush on unmount) with a restore offer on reopen (crash recovery).
+- Undo/redo now works on commands across ALL mutation sources (previously code/animation edits bypassed history entirely).
+
+### Exit criteria status
+
+| Criterion | Status |
+|---|---|
+| Canvas, code editor, layer panel, and export all read from the same document | ✅ all views derived from `VectorDocument` |
+| Layer rename, reorder, visibility, and lock operations persist | ✅ command-mutated attrs, autosaved to IndexedDB |
+| Every mutation is undoable | ✅ transactions incl. code edits, animation bakes, AI refinements, palette |
+| SVG export is generated from the canonical document | ✅ `documentToSvg` drives export/share/sync |
+
+**Verification:** 66 new unit tests (importer/exporter round-trips incl. namespaces & SMIL, tree immutability, command apply/undo for every command, history transactions/coalescing/redo, IndexedDB persistence + autosaver + migrations, layer selectors) + a smoke pass over all six bundled masterpieces (import → export → re-import → undo stability). Suite total: **147 tests green**.
+
+**Known limitations (Phase 1):** history entries are not persisted (only document state); the LayerPanel still addresses layers by name at the callback boundary (uids resolved internally); nested-group layer ops are not yet exposed; multi-page documents are representable but the UI edits page 0.
+
+---
+
 ## 5. Feature status matrix (honest labels)
 
 Legend: **Implemented** (works end-to-end, tested where feasible) · **Partial** (works with meaningful caveats) · **UI prototype** (surface exists, underlying behavior missing/incomplete) · **Experimental** (works but not production-safe)
@@ -143,10 +186,10 @@ Legend: **Implemented** (works end-to-end, tested where feasible) · **Partial**
 | AI SVG generation (text→SVG) | Partial | Requires `GEMINI_API_KEY`; output now contract-validated + sanitized; nondeterministic by nature |
 | AI refinement / animation / vectorization | Partial | Same contract/sanitization path; model-availability dependent |
 | Direct SVG import | Partial | Screened + stripped; fidelity vs. Inkscape/Illustrator files unverified (no compatibility matrix yet) |
-| Layer panel (view, visibility, lock, rename, reorder, blend, add) | Implemented | Persisted to document + undoable (this pass); nested hierarchy is display-only |
+| Layer panel (view, visibility, lock, rename, reorder, blend, add) | Implemented | Command-mutated on the canonical document, undoable, autosaved; nested hierarchy is display-only |
 | Canvas pan/zoom/grid/grain/glow | Implemented | Viewport transforms only — not object transforms |
-| Code editor ↔ canvas sync | Partial | One-way string state; no diffing or structured editing |
-| Undo/redo | Partial | SVG-snapshot stack in the studio; resets on artwork switch; no named states/branching |
+| Code editor ↔ canvas sync | Implemented | Bidirectional through the canonical document; semantic change detection (cosmetic edits skipped); echo suppression |
+| Undo/redo | Implemented | Command-based transactions with precise inverses across all mutation sources; typing coalescing; not yet persisted across sessions |
 | Local palette application | Implemented | Deterministic remap (this pass); was previously an AI round-trip |
 | Animation studio (SMIL/CSS keyframes, GIF, sprite sheets) | Experimental | No interpolation compatibility validation; GIF is a weak primary target |
 | Client-side vectorization algorithms | Experimental | Artistic transformations, not faithful tracing; no fidelity scoring |
@@ -155,14 +198,14 @@ Legend: **Implemented** (works end-to-end, tested where feasible) · **Partial**
 | React component export | Partial | Generates presentational components; untested against real projects |
 | Selection / direct manipulation / boolean ops / typography / snapping | **Not implemented** | The Phase 2 editing kernel |
 | Multi-user collaboration / comments / versioning | **Not implemented** | Phase 6 |
-| Offline/local editing mode | **Not implemented** | Phase 1+ (documents currently persist to `localStorage` history only) |
+| Offline/local editing mode | Partial | Documents autosave to IndexedDB with crash-recovery restore (Phase 1); AI-free editing still limited to layer/color/code operations until Phase 2 |
 
 ---
 
 ## 6. Recommended next phases
 
-1. **Phase 1 — Canonical document engine:** typed scene graph with stable node IDs; SVG import/export adapters; command-based mutations with transactional undo/redo; IndexedDB persistence. Exit: canvas, code, layers, export all read one document.
-2. **Phase 2 — Editing kernel:** selection + hit testing, transforms, shape/pen/node tools, snapping, alignment. Exit: a user can build an icon from primitives without AI or the code editor.
+1. ~~**Phase 1 — Canonical document engine**~~ ✅ **implemented** (see §4.1): typed scene graph with stable node IDs; SVG import/export adapters; command-based mutations with transactional undo/redo; IndexedDB persistence + crash recovery.
+2. **Phase 2 — Editing kernel (next):** selection + hit testing, transforms, shape/pen/node tools, snapping, alignment. Exit: a user can build an icon from primitives without AI or the code editor.
 3. **Phase 3 — AI as a safe editing agent:** validated operation plans (set-property/translate/create-shape…) against node IDs, with preview/accept/reject — AI stops replacing whole documents.
 4. **Phase 4 — Evaluation harness:** benchmark corpus, visual diffing, SVG validity/accessibility scoring, determinism controls.
 5. **Phase 5+ — Workers, components/tokens, collaboration, headless export.**

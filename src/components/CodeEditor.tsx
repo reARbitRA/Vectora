@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { SvgMetrics, VectorArtwork } from '../types';
 import {
   computeSvgMetrics,
@@ -7,6 +7,7 @@ import {
   optimizePathData,
   PathOptimizationResult
 } from '../utils/svgParser';
+import { svgSemanticallyEqual } from '../document';
 import {
   Code2,
   Copy,
@@ -35,10 +36,28 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ artwork, onUpdateSvg }) 
   const [parseError, setParseError] = useState<string | null>(null);
   const [cleanStats, setCleanStats] = useState<PathOptimizationResult | null>(null);
 
+  // The last value this editor emitted. When the canonical document echoes
+  // our own edit back (artwork.svg updates with the document's serialization,
+  // which may differ cosmetically — whitespace, attribute order), we keep the
+  // user's text instead of clobbering it mid-typing.
+  const lastEmittedRef = useRef<string | null>(null);
+
   useEffect(() => {
+    if (
+      lastEmittedRef.current !== null &&
+      svgSemanticallyEqual(artwork.svg, lastEmittedRef.current)
+    ) {
+      return; // echo of our own edit — keep the user's text
+    }
+    lastEmittedRef.current = null;
     setCode(artwork.svg);
     setMetrics(computeSvgMetrics(artwork.svg));
   }, [artwork.svg]);
+
+  const commit = (newCode: string) => {
+    lastEmittedRef.current = newCode;
+    onUpdateSvg(newCode);
+  };
 
   const handleCodeChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const newCode = e.target.value;
@@ -54,7 +73,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ artwork, onUpdateSvg }) 
       } else {
         setParseError(null);
         setMetrics(computeSvgMetrics(newCode));
-        onUpdateSvg(newCode);
+        commit(newCode);
       }
     } catch (err: any) {
       setParseError(err.message || 'Invalid SVG XML');
@@ -64,14 +83,14 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ artwork, onUpdateSvg }) 
   const handleFormatCode = () => {
     const formatted = formatSvgXml(code);
     setCode(formatted);
-    onUpdateSvg(formatted);
+    commit(formatted);
     setCleanStats(null);
   };
 
   const handleCleanSvg = () => {
     const result = optimizePathData(code);
     setCode(result.optimizedSvg);
-    onUpdateSvg(result.optimizedSvg);
+    commit(result.optimizedSvg);
     setMetrics(computeSvgMetrics(result.optimizedSvg));
     setCleanStats(result);
 

@@ -78,7 +78,21 @@
     │   ├── ReusableComponentShowcase.tsx # Library of modular UI icons, dials & HUD symbols
     │   ├── SafeSvg.tsx              # Sanitized SVG renderer — the only sanctioned inline-SVG path
     │   ├── StudioCanvas.tsx         # Pan/zoom vector artboard with Cartesian/Polar grids
-    │   └── UnifiedStudio.tsx        # Integrated master workstation unifying all studio panels
+    │   └── UnifiedStudio.tsx        # Integrated master workstation (canonical document + command history)
+    │
+    ├── document/                     # Canonical document engine (Phase 1) — the editing source of truth
+    │   ├── types.ts                  # VectorDocument, PageNode, Element/Text/Comment nodes, schema version
+    │   ├── ids.ts                    # Stable node uid generation
+    │   ├── tree.ts                   # Immutable tree operations (path copying, no-op identity)
+    │   ├── importer.ts               # SVG → document adapter (uid reuse, semantic equality, whitespace policy)
+    │   ├── exporter.ts               # Document → canonical pretty-printed SVG adapter
+    │   ├── selectors.ts              # Document → LayerSpec[] derivation
+    │   ├── commands.ts               # Command-based mutations (attr, reorder, add/remove, replace, palette)
+    │   ├── history.ts                # Transactional undo/redo with coalescing
+    │   ├── migrations.ts             # Schema version migration chain
+    │   ├── persistence.ts            # IndexedDB store + debounced autosaver
+    │   ├── index.ts                  # Public surface of the document engine
+    │   └── __tests__/                # 66 unit tests: round-trips, commands, history, persistence, selectors
     │
     ├── data/                        # Static datasets, preset themes & vector libraries
     │   ├── masterpieces.ts          # Curated SVG masterpieces with pre-parsed layers & palettes
@@ -160,14 +174,14 @@
 
 | Component | Responsibility |
 | :--- | :--- |
-| **`UnifiedStudio.tsx`** | Central workstation integrating the interactive artboard, layer hierarchy, parametric drawer, code view, animation preview, and refinement bar into a unified workspace. |
+| **`UnifiedStudio.tsx`** | Central workstation integrating the interactive artboard, layer hierarchy, parametric drawer, code view, animation preview, and refinement bar. Owns the canonical `VectorDocument` + command history; all views derive from it (Phase 1). |
 | **`StudioCanvas.tsx`** | Vector canvas viewport with transform matrix pan and zoom, mouse-wheel zoom, coordinate crosshair readout, aspect ratio framing, and switchable Cartesian / Polar / Isometric drafting grids. |
 | **`CommandPalette.tsx`** | Global spotlight command palette (Cmd/Ctrl+K) for workspace navigation, quick prompt synthesis, direct SVG/PNG export, and shortcut reference. |
 | **`KeyboardShortcutsModal.tsx`** | Visual modal displaying keybindings for navigation (Ctrl+1/2/3), generation (Ctrl+N), export (Ctrl+Shift+S/P), and editing tools. |
 | **`LayerPanel.tsx`** | Tree-like AST layer viewer. Supports recursive sub-group inspection, layer visibility toggling, locking, solo/isolate mode, drag reordering, inline renaming, and CSS blend-mode selection. |
 | **`ParametricPanel.tsx`** | Real-time parametric tuning controls for stroke width multipliers, procedural SVG filter grain synthesis, and neon specular glow sliders. |
 | **`PaletteManager.tsx`** | Palette extraction, color harmonic remapping, swatch inspector, and live SVG fill/stroke replacement across preset themes. |
-| **`CodeEditor.tsx`** | In-browser SVG XML code editor with syntax formatting, node counter, error detection, and bidirectional canvas synchronization. |
+| **`CodeEditor.tsx`** | In-browser SVG XML code editor with syntax formatting, node counter, error detection, and bidirectional document synchronization (semantic change detection + echo suppression). |
 | **`DesignSpecPanel.tsx`** | Engineering metrics HUD displaying viewBox parameters, total elements, path count, memory footprint, and gradient definitions. |
 | **`KeyframeTimeline.tsx`** | Kinetic animation timeline featuring a playhead scrubber, time markers, playback speed multipliers (0.5x to 2x), and loop controls. |
 | **`AnimationStudio.tsx`** | Dedicated motion graphics view for designing, testing, and previewing CSS/SMIL kinetic animations on SVG paths. |
@@ -188,6 +202,23 @@
 | **`MainLayout.tsx`** | Responsive structural wrapper orchestrating drawer positioning, sidebar collapse states, and viewport containment. |
 
 ---
+
+### 2.4b Canonical Document Engine (`/src/document`) — Phase 1
+
+The authoritative editing model. SVG strings are inputs/outputs here, never the editing state.
+
+| File / Path | Role & Responsibility |
+| :--- | :--- |
+| **`src/document/types.ts`** | Defines `VectorDocument`, `PageNode`, and the `VectorNode` union (`ElementNode`/`TextNode`/`CommentNode`) with namespaced attribute preservation and the schema version constant. |
+| **`src/document/tree.ts`** | Immutable tree operations (find/update/insert/remove/move) with structural path sharing; identity-preserving no-ops let the history manager skip empty transactions. |
+| **`src/document/importer.ts`** | SVG → document adapter: stable uid assignment, uid reuse by element id across re-imports (AI refinement, code edits), insignificant-whitespace policy, `svgSemanticallyEqual` cosmetic-change detection. |
+| **`src/document/exporter.ts`** | Document → canonical, pretty-printed SVG serialization with namespace-correct attributes and verbatim text content. |
+| **`src/document/commands.ts`** | The command set: `SetNodeAttr`, `SetNodeText`, `AddNode`, `RemoveNode`, `ReorderNode`, `ReplaceDocument`, `ApplyPalette`, plus factories for rename/blend/new-layer — each captures its precise inverse during apply. |
+| **`src/document/history.ts`** | Transactional undo/redo manager: one apply = one undo step, no-op skipping, coalescing of rapid source edits into a single entry. |
+| **`src/document/selectors.ts`** | Derives `LayerSpec[]` (visibility, lock, blend, element counts) directly from document attributes. |
+| **`src/document/migrations.ts`** | Ordered schema-version migration chain (v0→v1) with loud rejection of future versions. |
+| **`src/document/persistence.ts`** | IndexedDB document store and debounced autosaver used by the studio for crash recovery. |
+| **`src/document/__tests__/`** | 66 unit tests covering import/export round-trips (namespaces, SMIL, styles, comments), command apply/undo, history semantics, persistence, and migrations. |
 
 ### 2.5 Static Datasets & Palettes (`/src/data`)
 

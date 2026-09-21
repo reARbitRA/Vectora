@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Layers, Palette, Zap, Puzzle, FileCode, Search, 
@@ -20,14 +20,27 @@ import { RefinePromptBar } from './RefinePromptBar';
 import { CanvasSettings, LayerSpec, VectorArtwork } from '../types';
 import { exportSvgToPng, downloadBlob } from '../utils/svgParser';
 import {
-  setSvgLayerVisibility,
-  setSvgLayerLock,
-  renameSvgLayer,
-  reorderSvgLayer,
-  addNewSvgLayer,
-  setSvgLayerBlendMode,
-  remapSvgColors,
-} from '../utils/svgParser';
+  importSvg,
+  emptyDocument,
+  documentToSvg,
+  layersFromDocument,
+  layerUidByName,
+  svgSemanticallyEqual,
+  HistoryManager,
+  AddNodeCommand,
+  ApplyPaletteCommand,
+  EditorCommand,
+  ReplaceDocumentCommand,
+  ReorderNodeCommand,
+  SetNodeAttrCommand,
+  buildBlendModeCommands,
+  buildRenameLayerCommands,
+  createLayerNode,
+  loadDocument,
+  createAutosaver,
+  type Autosaver,
+  type VectorDocument,
+} from '../document';
 
 interface UnifiedStudioProps {
   artwork: VectorArtwork;
@@ -53,9 +66,26 @@ export const UnifiedStudio: React.FC<UnifiedStudioProps> = ({
   // GitHub connection state. The OAuth token lives in a server-side session
   // (HTTP-only cookie) — the browser never stores or handles the raw token.
   const [githubConnected, setGithubConnected] = useState(false);
-  
-  // Real Layer State
-  const [layers, setLayers] = useState<LayerSpec[]>(artwork.layers || []);
+
+  // ── Canonical document state (Phase 1) ─────────────────────────────────
+  // The VectorDocument is the single source of truth. `layers` and
+  // `exportedSvg` are DERIVED views; the canvas, code editor, layer panel,
+  // and exporters all read from the same document through them.
+  const [vectorDoc, setVectorDoc] = useState<VectorDocument | null>(null);
+  const [exportedSvg, setExportedSvg] = useState(artwork.svg);
+  const [layers, setLayers] = useState<LayerSpec[]>(() => {
+    const imported = importSvg(artwork.svg, { documentId: artwork.id, name: artwork.title });
+    return imported ? layersFromDocument(imported) : artwork.layers || [];
+  });
+
+  const historyRef = useRef<HistoryManager | null>(null);
+  const autosaveRef = useRef<Autosaver | null>(null);
+  if (!autosaveRef.current) autosaveRef.current = createAutosaver(800);
+  // Tracks whether the document can authoritatively drive artwork.svg
+  // (false when artwork.svg could not be imported — avoids clobbering it).
+  const docHealthyRef = useRef(true);
+  const importedForIdRef = useRef<string | null>(null);
+  const [historyFlags, setHistoryFlags] = useState({ canUndo: false, canRedo: false });
 
   // Dynamic Canvas Viewport Settings
   const [canvasSettings, setCanvasSettings] = useState<CanvasSettings>({
@@ -74,158 +104,234 @@ export const UnifiedStudio: React.FC<UnifiedStudioProps> = ({
     setCanvasSettings((prev) => ({ ...prev, ...newSettings }));
   };
 
-  // Undo / Redo SVG Stack
-  const [svgHistory, setSvgHistory] = useState<string[]>([artwork.svg]);
-  const [historyIndex, setHistoryIndex] = useState(0);
+  /**
+   * Publish a new document state to every consumer: React state (doc,
+   * derived layers, exported SVG), the App artwork (so the rest of the app
+   * and localStorage history stay in sync), and IndexedDB autosave.
+   */
+  const publishDocument = (doc: VectorDocument) => {
+    const svg = documentToSvg(doc);
+    setVectorDoc(doc);
+    setExportedSvg(svg);
+    setLayers(layersFromDocument(doc));
+    setHistoryFlags({
+      canUndo: historyRef.current?.canUndo() ?? false,
+      canRedo: historyRef.current?.canRedo() ?? false,
+    });
+    if (docHealthyRef.current && svg !== artwork.svg) onUpdateSvg(svg);
+    autosaveRef.current?.save(doc);
+  };
 
-  // Sync layers and history when artwork changes
-  React.useEffect(() => {
-    if (artwork.layers) setLayers(artwork.layers);
-    setSvgHistory([artwork.svg]);
-    setHistoryIndex(0);
+  /** Apply commands as one undoable transaction against the document. */
+  const applyCommands = (
+    commands: EditorCommand | EditorCommand[],
+    label: string,
+    coalesceKey?: string,
+  ) => {
+    const history = historyRef.current;
+    if (!history) return;
+    const next = history.apply(commands, {
+      label,
+      ...(coalesceKey ? { coalesceKey } : {}),
+    });
+    if (next === history.current) return; // no-op transaction
+    publishDocument(next);
+  };
+
+  // Import the artwork as a canonical document when the artwork changes.
+  useEffect(() => {
+    if (importedForIdRef.current === artwork.id) return;
+    importedForIdRef.current = artwork.id;
+
+    const imported = importSvg(artwork.svg, {
+      documentId: artwork.id,
+      name: artwork.title,
+      metadata: { title: artwork.title, source: 'local' },
+    });
+    const doc = imported ?? emptyDocument({ documentId: artwork.id, name: artwork.title });
+    docHealthyRef.current = !!imported;
+    if (!imported) {
+      console.warn('[studio] artwork.svg could not be imported; document sync paused for this artwork');
+    }
+    historyRef.current = new HistoryManager(doc);
+    setVectorDoc(doc);
+    setExportedSvg(artwork.svg);
+    setLayers(layersFromDocument(doc));
+    setHistoryFlags({ canUndo: false, canRedo: false });
+
+    // Crash recovery: offer the autosaved document when it differs from the
+    // artwork's persisted SVG.
+    let cancelled = false;
+    if (imported) {
+      loadDocument(artwork.id)
+        .then((saved) => {
+          if (cancelled || !saved) return;
+          if (documentToSvg(saved) !== artwork.svg) {
+            toast('Autosaved changes found', {
+              description: 'Restore unsaved edits for this design?',
+              action: {
+                label: 'Restore',
+                onClick: () => {
+                  historyRef.current?.reset(saved);
+                  publishDocument(saved);
+                  toast.success('Autosave restored');
+                },
+              },
+              duration: 12000,
+            });
+          }
+        })
+        .catch(() => {});
+    }
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [artwork.id]);
 
+  // Flush pending autosaves when the studio unmounts.
+  useEffect(() => () => autosaveRef.current?.flush(), []);
+
   const handleUndo = () => {
-    if (historyIndex > 0) {
-      const prevSvg = svgHistory[historyIndex - 1];
-      setHistoryIndex(historyIndex - 1);
-      onUpdateSvg(prevSvg);
-      toast.info('Undo applied', { description: 'Reverted canvas to previous state' });
-    }
+    const result = historyRef.current?.undo();
+    if (!result) return;
+    publishDocument(result.doc);
+    toast.info('Undo applied', { description: result.entry.label });
   };
 
   const handleRedo = () => {
-    if (historyIndex < svgHistory.length - 1) {
-      const nextSvg = svgHistory[historyIndex + 1];
-      setHistoryIndex(historyIndex + 1);
-      onUpdateSvg(nextSvg);
-      toast.info('Redo applied', { description: 'Restored forward canvas state' });
-    }
+    const result = historyRef.current?.redo();
+    if (!result) return;
+    publishDocument(result.doc);
+    toast.info('Redo applied', { description: result.entry.label });
   };
 
-  const handleUpdateSvgWithHistory = (newSvg: string) => {
-    onUpdateSvg(newSvg);
-    setSvgHistory((prev) => [...prev.slice(0, historyIndex + 1), newSvg]);
-    setHistoryIndex((prev) => prev + 1);
-  };
-
-  const handleUpdateLayers = (newLayers: LayerSpec[]) => {
-    setLayers(newLayers);
-  };
-
-  /**
-   * Apply a mutation to the SVG document itself (not just React state) and
-   * record it on the undo/redo stack. Layer operations MUST go through
-   * this so that exports, code view, reloads, and the canvas all agree —
-   * previously visibility/lock/rename only mutated React state, so the
-   * exported SVG silently disagreed with what the user saw.
-   */
-  const applySvgMutation = (mutate: (svg: string) => string) => {
-    const nextSvg = mutate(artwork.svg);
-    if (nextSvg && nextSvg !== artwork.svg) {
-      handleUpdateSvgWithHistory(nextSvg);
-    }
-  };
+  /** Resolve a layer's stable node uid from its panel name. */
+  const layerUid = (name: string): string | null =>
+    layers.find((l) => l.name === name)?.id ?? (vectorDoc ? layerUidByName(vectorDoc, name) : null);
 
   const handleToggleLayer = (name: string) => {
+    const uid = layerUid(name);
+    if (!uid) return;
     const layer = layers.find((l) => l.name === name);
     const nextVisible = layer ? !layer.visible : true;
-    // Persist visibility into the SVG document (display="none") so exports match the canvas.
-    applySvgMutation((svg) => setSvgLayerVisibility(svg, name, nextVisible));
-    handleUpdateLayers(layers.map((l) => (l.name === name ? { ...l, visible: nextVisible } : l)));
+    // Visibility is persisted into the document (display="none") — exports,
+    // reloads, and the code view all read the same state.
+    applyCommands(
+      new SetNodeAttrCommand(uid, 'display', nextVisible ? null : 'none'),
+      `${nextVisible ? 'Show' : 'Hide'} ${name}`,
+    );
   };
 
   const handleToggleLock = (name: string) => {
+    const uid = layerUid(name);
+    if (!uid) return;
     const layer = layers.find((l) => l.name === name);
     const nextLocked = layer ? !layer.locked : true;
-    // Persist the lock flag into the SVG document as well.
-    applySvgMutation((svg) => setSvgLayerLock(svg, name, nextLocked));
-    handleUpdateLayers(layers.map((l) => (l.name === name ? { ...l, locked: nextLocked } : l)));
+    applyCommands(
+      [
+        new SetNodeAttrCommand(uid, 'pointer-events', nextLocked ? 'none' : null),
+        new SetNodeAttrCommand(uid, 'data-locked', nextLocked ? 'true' : null),
+      ],
+      `${nextLocked ? 'Lock' : 'Unlock'} ${name}`,
+    );
   };
 
   const handleRenameLayer = (oldName: string, newName: string) => {
     if (!newName.trim() || oldName === newName) return;
-    // Rename in the SVG document (inkscape:label / id) so labels are not cosmetic-only.
-    applySvgMutation((svg) => renameSvgLayer(svg, oldName, newName));
-    handleUpdateLayers(layers.map((l) => (l.name === oldName ? { ...l, name: newName } : l)));
+    const uid = layerUid(oldName);
+    if (!uid) return;
+    applyCommands(buildRenameLayerCommands(uid, newName), `Rename layer to ${newName}`);
   };
 
   const handleSoloLayer = (name: string) => {
-    const next = layers.map((l) => ({ ...l, visible: l.name === name }));
-    // Persist every layer's visibility into the SVG document.
-    applySvgMutation((svg) =>
-      next.reduce((acc, l) => setSvgLayerVisibility(acc, l.name, l.visible), svg),
-    );
-    handleUpdateLayers(next);
+    const commands: EditorCommand[] = [];
+    for (const layer of layers) {
+      const uid = layerUid(layer.name);
+      if (!uid) continue;
+      const visible = layer.name === name;
+      if (layer.visible !== visible) {
+        commands.push(new SetNodeAttrCommand(uid, 'display', visible ? null : 'none'));
+      }
+    }
+    if (commands.length > 0) applyCommands(commands, `Solo ${name}`);
   };
 
   const handleShowAllLayers = () => {
-    const next = layers.map((l) => ({ ...l, visible: true }));
-    applySvgMutation((svg) =>
-      next.reduce((acc, l) => setSvgLayerVisibility(acc, l.name, l.visible), svg),
-    );
-    handleUpdateLayers(next);
+    const commands: EditorCommand[] = [];
+    for (const layer of layers) {
+      if (layer.visible) continue;
+      const uid = layerUid(layer.name);
+      if (uid) commands.push(new SetNodeAttrCommand(uid, 'display', null));
+    }
+    if (commands.length > 0) applyCommands(commands, 'Show all layers');
   };
 
   /**
-   * Reorder layers by name + direction. LayerPanel invokes this with
-   * (layerName, 'up' | 'down'); the previous implementation treated the
-   * arguments as numeric indexes, which corrupted the layer array.
-   *
-   * Ordering convention (matches reorderSvgLayer and the panel): the layers
+   * Reorder a layer by name + direction. Ordering convention: the layers
    * array is in document/draw order — index 0 paints first (back), the last
-   * index paints last (front). "Up"/Bring Forward therefore moves a layer to
-   * a LATER index, "down"/Send Backward to an earlier one.
+   * index paints last (front). "Up"/Bring Forward moves a layer to a LATER
+   * index, "down"/Send Backward to an earlier one.
    */
   const handleReorderLayer = (layerName: string, direction: 'up' | 'down' | 'top' | 'bottom') => {
-    const index = layers.findIndex((l) => l.name === layerName);
-    if (index === -1) return;
-    let targetIndex = index;
-    if (direction === 'up') targetIndex = Math.min(layers.length - 1, index + 1);
-    else if (direction === 'down') targetIndex = Math.max(0, index - 1);
-    else if (direction === 'top') targetIndex = layers.length - 1;
-    else if (direction === 'bottom') targetIndex = 0;
-    if (targetIndex === index) return;
-
-    const newLayers = [...layers];
-    const [moved] = newLayers.splice(index, 1);
-    newLayers.splice(targetIndex, 0, moved);
-    // Persist draw-order change into the SVG document.
-    applySvgMutation((svg) => reorderSvgLayer(svg, layerName, direction));
-    handleUpdateLayers(newLayers);
+    const uid = layerUid(layerName);
+    if (!uid) return;
+    applyCommands(new ReorderNodeCommand(uid, direction), `Move ${layerName} ${direction}`);
   };
 
   const handleAddNewLayer = () => {
     const name = `Layer ${layers.length + 1}`;
-    // Insert the layer group into the SVG document too ('top' = front of the
-    // stack = end of the document order).
-    applySvgMutation((svg) => addNewSvgLayer(svg, name, 'top'));
-    handleUpdateLayers([...layers, { name, visible: true, locked: false, opacity: 1, blendMode: 'normal' }]);
+    // New layer goes to the top of the stack (end of draw order).
+    applyCommands(new AddNodeCommand(createLayerNode(name), null, null), `Add layer ${name}`);
   };
 
   const handleSetBlendMode = (name: string, mode: string) => {
-    applySvgMutation((svg) => setSvgLayerBlendMode(svg, name, mode));
-    handleUpdateLayers(layers.map((l) => (l.name === name ? { ...l, blendMode: mode } : l)));
+    const uid = layerUid(name);
+    if (!uid || !vectorDoc) return;
+    applyCommands(buildBlendModeCommands(vectorDoc, uid, mode), `Set ${name} blend to ${mode}`);
   };
 
   /**
    * Apply a palette locally and deterministically by remapping the colors
-   * present in the SVG document. This used to round-trip through the AI
-   * (nondeterministic, network-dependent); now it is a local, undoable
-   * document mutation.
+   * in the document. Undoable via a single command (restores each original
+   * color individually).
    */
   const handleApplyPalette = (colors: string[]) => {
     if (!colors?.length) return;
-    applySvgMutation((svg) => remapSvgColors(svg, colors));
+    applyCommands(new ApplyPaletteCommand(colors), 'Apply palette');
     toast.success('Palette applied to document', {
       description: `${colors.length} colors remapped locally (undoable)`,
     });
   };
 
+  /**
+   * Apply an externally-produced SVG string (code editor, animation studio)
+   * to the document as a single undoable command. Cosmetic-only changes
+   * (pure reformatting) are detected semantically and skipped so they
+   * neither dirty the document nor spam the undo history; real changes are
+   * coalesced (one undo step per burst of typing/tweaking).
+   */
+  const handleExternalSvgChange = (newSvg: string, label: string, coalesceKey: string) => {
+    if (!vectorDoc || !historyRef.current) return;
+    if (svgSemanticallyEqual(newSvg, exportedSvg)) return; // cosmetic only
+    const next = importSvg(newSvg, {
+      documentId: artwork.id,
+      name: artwork.title,
+      preserveUidsFrom: vectorDoc,
+      metadata: vectorDoc.metadata,
+    });
+    if (!next) {
+      toast.error('Invalid SVG — document unchanged');
+      return;
+    }
+    applyCommands(new ReplaceDocumentCommand(next), label, coalesceKey);
+  };
+
   // Handle downloadable SVG export
   const handleDownloadSvg = () => {
     try {
-      const blob = new Blob([artwork.svg], { type: 'image/svg+xml;charset=utf-8' });
+      // Exported from the canonical document — never a stale artwork string.
+      const blob = new Blob([exportedSvg], { type: 'image/svg+xml;charset=utf-8' });
       const filename = `${artwork.title.toLowerCase().replace(/[^a-z0-9_-]/g, '-') || 'vectora-art'}.svg`;
       downloadBlob(blob, filename);
       toast.success('Vector Artwork Exported as .SVG', {
@@ -247,7 +353,7 @@ export const UnifiedStudio: React.FC<UnifiedStudioProps> = ({
     });
 
     try {
-      const blob = await exportSvgToPng(artwork.svg, scale);
+      const blob = await exportSvgToPng(exportedSvg, scale);
       const filename = `${artwork.title.toLowerCase().replace(/[^a-z0-9_-]/g, '-') || 'vectora-art'}.png`;
       downloadBlob(blob, filename);
       toast.success('Artwork Exported as .PNG', {
@@ -290,7 +396,7 @@ export const UnifiedStudio: React.FC<UnifiedStudioProps> = ({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [artwork.svg, artwork.title]);
+  }, [exportedSvg, artwork.title]);
 
   const handleRefine = async (instruction?: string) => {
     const message = instruction || chatMessage;
@@ -305,7 +411,7 @@ export const UnifiedStudio: React.FC<UnifiedStudioProps> = ({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          currentSvg: artwork.svg,
+          currentSvg: exportedSvg,
           instruction: message,
           currentTitle: artwork.title
         }),
@@ -320,8 +426,23 @@ export const UnifiedStudio: React.FC<UnifiedStudioProps> = ({
 
       const result = await response.json();
       if (result.success && result.data) {
-        handleUpdateSvgWithHistory(result.data.svg);
-        if (result.data.layers) setLayers(result.data.layers);
+        // Import the refined SVG as a new document (reusing node uids for
+        // elements whose ids survive the refinement) and apply it as one
+        // undoable command. The layer panel re-derives from the document —
+        // model-reported layer lists are no longer trusted directly.
+        const refinedSvg: string = result.data.svg;
+        const next = importSvg(refinedSvg, {
+          documentId: artwork.id,
+          name: artwork.title,
+          preserveUidsFrom: vectorDoc ?? undefined,
+          metadata: vectorDoc?.metadata,
+        });
+        if (!next) {
+          throw new Error('Refinement returned invalid SVG — document unchanged');
+        }
+        if (!svgSemanticallyEqual(refinedSvg, exportedSvg)) {
+          applyCommands(new ReplaceDocumentCommand(next), 'AI refinement');
+        }
         setChatMessage('');
         toast.success('Design Refined', { id: toastId });
       } else {
@@ -389,7 +510,7 @@ export const UnifiedStudio: React.FC<UnifiedStudioProps> = ({
         body: JSON.stringify({
           repo,
           path: `designs/${artwork.title.toLowerCase().replace(/\s+/g, '-')}.svg`,
-          content: artwork.svg,
+          content: exportedSvg,
           message: `Update design: ${artwork.title}`
         }),
       });
@@ -565,7 +686,7 @@ export const UnifiedStudio: React.FC<UnifiedStudioProps> = ({
                   url: window.location.href,
                 }).catch(() => {});
               } else {
-                navigator.clipboard.writeText(artwork.svg);
+                navigator.clipboard.writeText(exportedSvg);
                 toast.success('SVG Markup copied to clipboard');
               }
             }}
@@ -598,7 +719,7 @@ export const UnifiedStudio: React.FC<UnifiedStudioProps> = ({
               {activeTool === 'layers' && (
                 <LayerPanel 
                   layers={layers} 
-                  svgString={artwork.svg} 
+                  svgString={exportedSvg} 
                   onToggleLayer={handleToggleLayer} 
                   onToggleLock={handleToggleLock}
                   onRenameLayer={handleRenameLayer}
@@ -614,13 +735,24 @@ export const UnifiedStudio: React.FC<UnifiedStudioProps> = ({
                 <PaletteManager 
                   onApplyPalette={handleApplyPalette} 
                   currentColors={artwork.palette || []} 
-                  activeSvg={artwork.svg} 
+                  activeSvg={exportedSvg} 
                 />
               )}
-              {activeTool === 'animation' && <AnimationStudio artwork={artwork} onUpdateSvg={onUpdateSvg} onSwitchToCanvas={() => setActiveTool(null)} />}
+              {activeTool === 'animation' && (
+                <AnimationStudio
+                  artwork={artwork}
+                  onUpdateSvg={(svg) => handleExternalSvgChange(svg, 'Apply animation', 'animation-bake')}
+                  onSwitchToCanvas={() => setActiveTool(null)}
+                />
+              )}
               {activeTool === 'plugins' && <PluginGallery />}
               {activeTool === 'specs' && <DesignSpecPanel artwork={artwork} />}
-              {activeTool === 'code' && <CodeEditor artwork={artwork} onUpdateSvg={onUpdateSvg} />}
+              {activeTool === 'code' && (
+                <CodeEditor
+                  artwork={artwork}
+                  onUpdateSvg={(svg) => handleExternalSvgChange(svg, 'Edit SVG source', 'code-edit')}
+                />
+              )}
             </div>
           </motion.div>
         )}
@@ -673,8 +805,8 @@ export const UnifiedStudio: React.FC<UnifiedStudioProps> = ({
           onUpdateSettings={handleUpdateSettings}
           onUndo={handleUndo}
           onRedo={handleRedo}
-          canUndo={historyIndex > 0}
-          canRedo={historyIndex < svgHistory.length - 1}
+          canUndo={historyFlags.canUndo}
+          canRedo={historyFlags.canRedo}
         />
 
         {/* Real-Time On-Canvas Prompt Refinement */}
