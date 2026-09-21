@@ -1,3 +1,4 @@
+import { SafeSvg } from './SafeSvg';
 import React, { useState, useEffect } from 'react';
 import { VectorArtwork } from '../types';
 import { MASTERPIECES } from '../data/masterpieces';
@@ -181,9 +182,9 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
                 >
                   {/* SVG Stage */}
                   <div className="relative aspect-square w-full bg-[#050505] overflow-hidden p-6 flex items-center justify-center border-b border-[#2A2A2A]">
-                    <div
+                    <SafeSvg
                       className="w-full h-full flex items-center justify-center transform group-hover:scale-105 transition-transform duration-300 pointer-events-none"
-                      dangerouslySetInnerHTML={{ __html: item.svg }}
+                      svg={item.svg}
                     />
 
                     {isSelected && (

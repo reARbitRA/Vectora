@@ -15,20 +15,29 @@
 / (workspace-root)
 ├── .env.example                     # Environment variables schema and template
 ├── .gitignore                       # Git ignore declarations for build outputs & secrets
+├── .github/                         # CI quality gate (typecheck, tests, build)
+│   └── workflows/ci.yml             # GitHub Actions pipeline for pushes & pull requests
 ├── AGENTS.md                        # Persistent agent instructions and maintenance rules
 ├── VERIFICATION_REPORT.md           # System verification, stress-test audit & diagnostic logs
 ├── bun.lock                         # Bun runtime lockfile
 ├── index.html                       # HTML application entry point & Google Fonts loading
 ├── metadata.json                    # Application metadata, permissions & capabilities
-├── package.json                     # Project manifest, npm dependencies & build scripts
-├── server.ts                        # Express backend, Vite dev middleware & AI model orchestrator
+├── package.json                     # Project manifest (vectora), npm dependencies & build scripts
+├── README.md                        # Honest project overview, setup & status summary
+├── server.ts                        # Express backend entry, routes & AI model orchestrator
+├── server/                          # Server modules (Phase 0 stabilization split)
+│   ├── config.ts                    # Env-driven configuration (PORT, limits, rate budgets, TTLs)
+│   ├── ai/contracts.ts              # Runtime validation of AI JSON responses (schema + bounds)
+│   └── security/                    # svgGuard, rateLimit, oauthState, sessions modules
 ├── tsconfig.json                    # TypeScript compiler configuration & path definitions
 ├── verify_system.ts                 # Automated end-to-end backend verification script
 ├── vite.config.ts                   # Vite bundler configuration & Tailwind integration
+├── vitest.config.ts                 # Test runner configuration (node + jsdom environments)
 │
 ├── docs/                            # Technical reports & system architecture documentation
 │   ├── APP_REPORT.md                # Comprehensive feature matrix & application report
 │   ├── ARCHITECTURE_REPORT.md       # High-level architecture, SVG standards & engine specs
+│   ├── AUDIT.md                     # Verified repository audit, feature status matrix & roadmap
 │   └── FILE_TREE.md                 # Living project file tree & directory documentation (this file)
 │
 ├── public/                          # Static web assets served directly by Vite/Express
@@ -67,6 +76,7 @@
     │   ├── PluginGallery.tsx        # Extensible vector filters & generative effects showcase
     │   ├── RefinePromptBar.tsx      # Natural language conversational refinement prompt bar
     │   ├── ReusableComponentShowcase.tsx # Library of modular UI icons, dials & HUD symbols
+    │   ├── SafeSvg.tsx              # Sanitized SVG renderer — the only sanctioned inline-SVG path
     │   ├── StudioCanvas.tsx         # Pan/zoom vector artboard with Cartesian/Polar grids
     │   └── UnifiedStudio.tsx        # Integrated master workstation unifying all studio panels
     │
@@ -84,8 +94,10 @@
         │   └── index.ts             # Master animation preset registry & procedural SVG injector
         ├── gifRenderer.ts           # HTML5 Canvas frame-by-frame animated GIF exporter
         ├── spriteSheetRenderer.ts   # Multi-row vector animation sprite sheet generator
+        ├── sanitizeSvg.ts           # DOM-based SVG sanitizer (authoritative render gate)
         ├── svgAnimator.ts           # Kinetic SVG animation injection & CSS keyframe engine
         ├── svgParser.ts             # Semantic SVG DOM parser, layer extractor & node counter
+        ├── __tests__/               # Sanitizer XSS-vector & layer-persistence regression suites
         └── vectorization/           # 12-engine client-side raster-to-SVG vectorization suite
             ├── asciiMatrixTracer.ts     # Monospace ASCII terminal matrix vector renderer
             ├── cannyLineTracer.ts       # Canny edge detector & architectural blueprint tracer
@@ -110,13 +122,13 @@
 
 | File / Path | Role & Technology | Key Responsibilities |
 | :--- | :--- | :--- |
-| **`server.ts`** | Backend Entry (Express + Vite + TypeScript) | Serves the REST API on port `3000`, mounts Vite dev middleware, defines `/api/generate-svg`, `/api/refine-svg`, `/api/animate-svg`, and orchestrates multi-model rotation pool with retry/exponential backoff. |
-| **`package.json`** | Manifest & Scripts (npm) | Defines runtime packages (`@google/genai`, `motion`, `lucide-react`, `sonner`, `canvas-confetti`, `express`) and build scripts (`dev`, `build`, `start`, `lint`). |
+| **`server.ts`** | Backend Entry (Express + Vite + TypeScript) | Serves the REST API on `process.env.PORT` (fallback 3000), mounts Vite dev middleware, defines `/api/generate-svg`, `/api/refine-svg`, `/api/animate-svg`, `/api/import-vectorize`, `/api/generate-unified`, GitHub OAuth/sync routes, and orchestrates the multi-model pool with retry/backoff. Security modules, runtime AI contracts, and configuration live in **`server/`** (`config.ts`, `security/rateLimit.ts`, `security/oauthState.ts`, `security/sessions.ts`, `security/svgGuard.ts`, `ai/contracts.ts`) with unit tests under `server/**/__tests__/`. |
+| **`package.json`** | Manifest & Scripts (npm) | Package `vectora`; defines runtime packages (`@google/genai`, `motion`, `lucide-react`, `sonner`, `express`) and scripts (`dev`, `build`, `start`, `lint`, `test`, `test:watch`). |
 | **`tsconfig.json`** | TypeScript Configuration | Strict type-checking rules, modern ES modules target, JSX processing (`react-jsx`), and module resolution paths. |
 | **`vite.config.ts`** | Bundler & Dev Config | Configures Vite development server, binds port `3000`, and attaches `@tailwindcss/vite` plugin. |
 | **`metadata.json`** | Platform App Identity | Sets application name (*VECTORA — Generative SVG Design Studio*), capabilities (`MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API`), and permissions. |
 | **`index.html`** | Web Entry Point | Served to the browser; loads web fonts (JetBrains Mono, Inter, Plus Jakarta Sans), sets responsive viewport, and mounts `#root`. |
-| **`.env.example`** | Environment Contract | Defines required keys (`PORT`, `GEMINI_API_KEY`) without committing actual credentials. |
+| **`.env.example`** | Environment Contract | Documents `GEMINI_API_KEY`, `APP_URL`, `PORT`, GitHub OAuth keys, and all security/capacity limits (body size, SVG budgets, rate limits, TTLs) without committing credentials. |
 | **`verify_system.ts`** | Diagnostic Suite | Standalone test runner that queries all server endpoints with cooldown pacing to verify API integrity and quota status. |
 | **`AGENTS.md`** | Agent Rules & Conventions | Persistent instructions enforcing continuous updates to `/docs/FILE_TREE.md` whenever new files are created or altered. |
 
@@ -137,7 +149,7 @@
 
 | File / Path | Purpose & Functionality |
 | :--- | :--- |
-| **`src/main.tsx`** | Initializes React 18 createRoot, attaches the root component to `#root`, and applies strict mode. |
+| **`src/main.tsx`** | Initializes React 19 createRoot, attaches the root component to `#root`, and applies strict mode. |
 | **`src/App.tsx`** | Master application coordinator. Manages top-level routing between views (`home`, `studio`, `animation`, `gallery`), handles generation flows, tracks current artwork, and hosts global toasts (`Toaster`). |
 | **`src/index.css`** | Global stylesheet defining Tailwind CSS imports, custom scrollbar styling, grid background patterns, and monospace typography utility classes. |
 | **`src/types.ts`** | Central TypeScript definitions including `VectorArtwork`, `SvgLayer`, `ColorPalette`, `ParametricSettings`, `KineticAnimation`, `StudioLayout`, and export options. |

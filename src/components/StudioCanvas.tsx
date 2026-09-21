@@ -1,3 +1,4 @@
+import { SafeSvg } from './SafeSvg';
 import React, { useRef, useState, useEffect, useMemo } from 'react';
 import { CanvasSettings, LayerSpec, VectorArtwork, WorkspaceLayout } from '../types';
 import {
@@ -282,10 +283,10 @@ export const StudioCanvas: React.FC<StudioCanvasProps> = ({
             />
           )}
 
-          {/* Render Active SVG */}
-          <div
+          {/* Render Active SVG (sanitized — never render unsanitized markup) */}
+          <SafeSvg
             className="w-full h-full flex items-center justify-center [&>svg]:max-w-full [&>svg]:max-h-full"
-            dangerouslySetInnerHTML={{ __html: processedSvg }}
+            svg={processedSvg}
           />
         </div>
       </div>

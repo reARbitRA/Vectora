@@ -3,8 +3,15 @@
 > **Application Name:** VECTORA Studio  
 > **Version:** 2.6.0 Production Ready  
 > **Classification:** Generative Vector Graphics Engine & Vector Design Studio  
-> **Runtime Environment:** React 18+ (SPA) · Vite · Express Backend · Node.js · TypeScript · Tailwind CSS  
+> **Runtime Environment:** React 19 (SPA) · Vite · Express Backend · Node.js · TypeScript · Tailwind CSS  
 > **AI Architecture:** Multi-modal Gemini 2.5/3 Flash Vision & Structural Reasoning Engine (`@google/genai`)  
+
+> ⚠️ **Accuracy notice (2026-09-21):** This report was written as an aspirational
+> marketing/architecture document and **overstates implementation maturity** in places.
+> For the verified, tested state of each capability, see **`docs/AUDIT.md`** — including
+> the feature-status matrix and the Phase 0 stabilization changes (SVG sanitization,
+> OAuth hardening, server-side sessions, rate limiting, runtime AI contracts, layer
+> persistence fixes, test suite, and CI).
 
 ---
 
@@ -125,7 +132,7 @@ The platform provides a bridge between **computational generative AI** and **pro
 
 | Layer | Technologies / Libraries | Role & Implementation |
 |---|---|---|
-| **Frontend Framework** | React 18.3, TypeScript 5.5 | Type-safe UI state and reactive component hierarchy |
+| **Frontend Framework** | React 19, TypeScript 5.8 | Type-safe UI state and reactive component hierarchy |
 | **Styling & Design** | Tailwind CSS v4, Custom CSS | Strict dark-mode aesthetic (`#0A0A0A`, `#00FF00` accent), monospace typography |
 | **Animation & Motion** | `motion` (`motion/react`) | Smooth spring transitions for sliding drawers, modals, and layout shifts |
 | **Iconography** | `lucide-react` | Unified SVG icons across navigation, tools, and HUD |

@@ -4,13 +4,40 @@ import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
 import dotenv from "dotenv";
 import crypto from "crypto";
+import { loadConfig } from "./server/config";
+import { rateLimit } from "./server/security/rateLimit";
+import { issueOAuthState, validateOAuthState } from "./server/security/oauthState";
+import {
+  createSession,
+  getSession,
+  destroySession,
+  readCookie,
+  setSessionCookie,
+  clearSessionCookie,
+  sessionFromRequest,
+  originMatchesHost,
+  SESSION_COOKIE_NAME,
+} from "./server/security/sessions";
+import { stripUnsafeSvg, inspectSvg } from "./server/security/svgGuard";
+import {
+  validateGenerationResponse,
+  ContractViolationError,
+} from "./server/ai/contracts";
 
 dotenv.config();
 
+const config = loadConfig();
 const app = express();
-const PORT = 3000;
+// PORT comes from the environment (documented in .env.example); 3000 is only the fallback.
+const PORT = config.port;
 
-app.use(express.json({ limit: "50mb" }));
+app.use(express.json({ limit: config.jsonBodyLimit }));
+
+// Rate limits: the AI endpoints call paid models and are abuse-prone; the
+// GitHub endpoints touch user credentials. Cheap reads stay generous.
+const aiRateLimit = rateLimit("ai", config.rateLimits.ai);
+const githubRateLimit = rateLimit("github", config.rateLimits.github);
+const lightRateLimit = rateLimit("light", config.rateLimits.light);
 
 // ============================================================================
 // §1 — TYPE DEFINITIONS
@@ -945,13 +972,35 @@ function sanitizeString(input: any, maxLength: number = 50000): string {
   return input.slice(0, maxLength).trim();
 }
 
+/**
+ * Parse, validate, and sanitize a model response before it reaches the client.
+ *
+ * Previously routes did a bare `JSON.parse(result.text)` and forwarded the
+ * object; prompts are not validation, so malformed or malicious model output
+ * flowed straight through. This is the single chokepoint that enforces the
+ * response contract (types, bounds, SVG safety/complexity) for every AI route.
+ */
+function validateModelPayload(raw: string) {
+  const parsed = JSON.parse(raw);
+  const validated = validateGenerationResponse(parsed, {
+    maxSvgBytes: config.maxSvgBytes,
+    maxSvgElements: config.maxSvgElements,
+  });
+  // Defense in depth: strip anything dangerous the server-side deny-list finds.
+  const { svg: cleanSvg, removed } = stripUnsafeSvg(validated.svg);
+  if (removed.length > 0) {
+    console.warn(`[svgGuard] stripped from AI output: ${removed.join(", ")}`);
+  }
+  return { ...validated, svg: cleanSvg };
+}
+
 // ============================================================================
 // §8 — API ROUTES
 // ============================================================================
 
 // ── Health & Diagnostics ───────────────────────────────────────────────
 
-app.get("/api/health", (_req, res) => {
+app.get("/api/health", lightRateLimit, (_req, res) => {
   const aiConfigured = !!getAI();
   res.json({
     status: "ok",
@@ -961,7 +1010,7 @@ app.get("/api/health", (_req, res) => {
   });
 });
 
-app.get("/api/diagnostics/models", (_req, res) => {
+app.get("/api/diagnostics/models", lightRateLimit, (_req, res) => {
   res.json({
     models: ModelOrchestrator.getRegistryStatus(),
     timestamp: new Date().toISOString(),
@@ -970,7 +1019,7 @@ app.get("/api/diagnostics/models", (_req, res) => {
 
 // ── Generate SVG ───────────────────────────────────────────────────────
 
-app.post("/api/generate-svg", validateApiKey, async (req: Request, res: Response) => {
+app.post("/api/generate-svg", aiRateLimit, validateApiKey, async (req: Request, res: Response) => {
   try {
     const {
       prompt: rawPrompt,
@@ -1005,7 +1054,7 @@ Ensure the SVG adheres to the complete VECTORA engineering and artistic doctrine
       inputComplexityHint: complexity === "detailed" ? "complex" : complexity === "simple" ? "simple" : undefined,
     });
 
-    const parsed = JSON.parse(result.text);
+    const parsed = validateModelPayload(result.text);
 
     res.json({
       success: true,
@@ -1034,7 +1083,7 @@ Ensure the SVG adheres to the complete VECTORA engineering and artistic doctrine
 
 // ── Refine / Evolve SVG ────────────────────────────────────────────────
 
-app.post("/api/refine-svg", validateApiKey, async (req: Request, res: Response) => {
+app.post("/api/refine-svg", aiRateLimit, validateApiKey, async (req: Request, res: Response) => {
   try {
     const {
       currentSvg: rawSvg,
@@ -1070,7 +1119,7 @@ Output MUST be valid JSON conforming to the schema.
       taskType: "refine",
     });
 
-    const parsed = JSON.parse(result.text);
+    const parsed = validateModelPayload(result.text);
 
     res.json({
       success: true,
@@ -1096,7 +1145,7 @@ Output MUST be valid JSON conforming to the schema.
 
 // ── Animate SVG ────────────────────────────────────────────────────────
 
-app.post("/api/animate-svg", validateApiKey, async (req: Request, res: Response) => {
+app.post("/api/animate-svg", aiRateLimit, validateApiKey, async (req: Request, res: Response) => {
   try {
     const {
       currentSvg: rawSvg,
@@ -1139,7 +1188,7 @@ Output MUST be valid JSON conforming to the schema.
       taskType: "animate",
     });
 
-    const parsed = JSON.parse(result.text);
+    const parsed = validateModelPayload(result.text);
 
     res.json({
       success: true,
@@ -1165,7 +1214,7 @@ Output MUST be valid JSON conforming to the schema.
 
 // ── Import & Vectorize ─────────────────────────────────────────────────
 
-app.post("/api/import-vectorize", validateApiKey, async (req: Request, res: Response) => {
+app.post("/api/import-vectorize", aiRateLimit, validateApiKey, async (req: Request, res: Response) => {
   try {
     const {
       type,
@@ -1182,15 +1231,33 @@ app.post("/api/import-vectorize", validateApiKey, async (req: Request, res: Resp
     const fileName = sanitizeString(rawFileName, 500);
     const promptCustomization = sanitizeString(rawCustomization, 5000);
 
-    // Direct SVG import — no AI needed
+    // Direct SVG import — no AI needed, but the file is untrusted input and
+    // must pass the safety/complexity guard before it enters the studio.
     if (type === "svg" && rawSvg) {
+      const importedSvg = typeof rawSvg === "string" ? rawSvg : "";
+      const verdict = inspectSvg(importedSvg, {
+        maxSvgBytes: config.maxSvgBytes,
+        maxSvgElements: config.maxSvgElements,
+      });
+      if (!verdict.ok) {
+        res.status(400).json({
+          error: `Imported SVG rejected: ${verdict.reason}${
+            verdict.violations.length ? ` (violations: ${verdict.violations.join(", ")})` : ""
+          }`,
+        });
+        return;
+      }
+      const { svg: cleanSvg, removed } = stripUnsafeSvg(importedSvg);
+      if (removed.length > 0) {
+        console.warn(`[svgGuard] stripped from imported SVG: ${removed.join(", ")}`);
+      }
       res.json({
         success: true,
         data: {
           title: fileName ? fileName.replace(/\.svg$/i, "") : "Imported Vector Design",
           concept: "Directly imported and standardized vector SVG artwork into VECTORA studio.",
           style: sanitizeString(targetStyle, 200),
-          svg: rawSvg,
+          svg: cleanSvg,
         },
       });
       return;
@@ -1242,7 +1309,7 @@ TASK:
         }],
       });
 
-      const parsed = JSON.parse(result.text);
+      const parsed = validateModelPayload(result.text);
       res.json({
         success: true,
         data: parsed,
@@ -1284,7 +1351,7 @@ TASK:
         taskType: "vectorize",
       });
 
-      const parsed = JSON.parse(result.text);
+      const parsed = validateModelPayload(result.text);
       res.json({
         success: true,
         data: parsed,
@@ -1313,7 +1380,7 @@ TASK:
 
 // ── Unified Generation (Text + Vision) ─────────────────────────────────
 
-app.post("/api/generate-unified", validateApiKey, async (req: Request, res: Response) => {
+app.post("/api/generate-unified", aiRateLimit, validateApiKey, async (req: Request, res: Response) => {
   try {
     const { prompt: rawPrompt, image, type } = req.body;
 
@@ -1356,7 +1423,7 @@ app.post("/api/generate-unified", validateApiKey, async (req: Request, res: Resp
       { contents, taskType }
     );
 
-    const parsed = JSON.parse(result.text);
+    const parsed = validateModelPayload(result.text);
     res.json({
       success: true,
       data: parsed,
@@ -1373,9 +1440,9 @@ app.post("/api/generate-unified", validateApiKey, async (req: Request, res: Resp
   }
 });
 
-// ── GitHub OAuth ───────────────────────────────────────────────────────
+// ── GitHub OAuth ────────────────────────────────────────────────
 
-app.get("/api/auth/github/url", (req: Request, res: Response) => {
+app.get("/api/auth/github/url", githubRateLimit, (req: Request, res: Response) => {
   const clientId = process.env.GITHUB_CLIENT_ID;
   if (!clientId) {
     res.status(503).json({ error: "GitHub OAuth is not configured" });
@@ -1383,19 +1450,28 @@ app.get("/api/auth/github/url", (req: Request, res: Response) => {
   }
   const baseUrl = process.env.APP_URL || `${req.protocol}://${req.get("host")}`;
   const redirectUri = `${baseUrl}/api/auth/github/callback`;
-  // Generate CSRF state token
-  const state = crypto.randomBytes(16).toString("hex");
+  // Issue a single-use CSRF state token; it is stored server-side and
+  // validated (and consumed) during the callback below.
+  const state = issueOAuthState(config.oauthStateTtlMs);
   const url = `https://github.com/login/oauth/authorize?client_id=${encodeURIComponent(clientId)}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=repo,user:email&state=${state}`;
-  res.json({ url, state });
+  res.json({ url });
 });
 
-app.get("/api/auth/github/callback", async (req: Request, res: Response) => {
-  const { code } = req.query;
+app.get("/api/auth/github/callback", githubRateLimit, async (req: Request, res: Response) => {
+  const { code, state } = req.query;
   const clientId = process.env.GITHUB_CLIENT_ID;
   const clientSecret = process.env.GITHUB_CLIENT_SECRET;
 
   if (!code || !clientId || !clientSecret) {
     res.status(400).send("Missing OAuth parameters");
+    return;
+  }
+
+  // CSRF protection: the state must match a token this server issued,
+  // must not have expired, and is single-use (consumed on validation).
+  const stateCheck = validateOAuthState(state);
+  if (!stateCheck.valid) {
+    res.status(403).send("Invalid or expired OAuth state. Please restart the GitHub connection.");
     return;
   }
 
@@ -1420,9 +1496,11 @@ app.get("/api/auth/github/callback", async (req: Request, res: Response) => {
       return;
     }
 
-    // SECURITY: Use postMessage with explicit origin instead of '*'
-    // and HTML-encode the token to prevent XSS
+    // SECURITY: the access token never reaches the browser. It is stored in a
+    // server-side session; the browser only holds an opaque HTTP-only cookie.
     const sanitizedToken = data.access_token.replace(/[^a-zA-Z0-9_-]/g, "");
+    const sessionId = createSession(sanitizedToken, config.sessionTtlMs);
+    setSessionCookie(res, sessionId, config.sessionTtlMs);
 
     res.send(`<!DOCTYPE html>
 <html lang="en">
@@ -1434,7 +1512,7 @@ app.get("/api/auth/github/callback", async (req: Request, res: Response) => {
       try {
         if (window.opener) {
           window.opener.postMessage(
-            { type: 'GITHUB_AUTH_SUCCESS', token: ${JSON.stringify(sanitizedToken)} },
+            { type: 'GITHUB_AUTH_SUCCESS' },
             window.location.origin
           );
         }
@@ -1444,17 +1522,45 @@ app.get("/api/auth/github/callback", async (req: Request, res: Response) => {
   </script>
 </body>
 </html>`);
-  } catch (error) {
-    console.error("GitHub Auth error:", error);
+  } catch (error: any) {
+    console.error("GitHub Auth error:", error.message);
     res.status(500).send("GitHub authentication failed. Please try again.");
   }
 });
 
-app.post("/api/github/sync", async (req: Request, res: Response) => {
-  const { token, repo, path: filePath, content, message } = req.body;
+/** Reports whether the current browser holds a live server-side GitHub session. */
+app.get("/api/auth/github/status", githubRateLimit, (req: Request, res: Response) => {
+  const session = sessionFromRequest(req);
+  res.json({ connected: !!session });
+});
 
-  if (!token || !repo || !filePath || !content) {
-    res.status(400).json({ error: "Missing required fields: token, repo, path, content" });
+/** Destroys the server-side GitHub session and clears the cookie. */
+app.post("/api/auth/github/logout", githubRateLimit, (req: Request, res: Response) => {
+  destroySession(readCookie(req, SESSION_COOKIE_NAME));
+  clearSessionCookie(res);
+  res.json({ success: true });
+});
+
+app.post("/api/github/sync", githubRateLimit, async (req: Request, res: Response) => {
+  // The token is never accepted from the client body anymore: it lives in the
+  // server-side session created during OAuth. This closes the confused-deputy
+  // hole where any browser could push any token through this endpoint.
+  const session = sessionFromRequest(req);
+  if (!session) {
+    res.status(401).json({ error: "Not authenticated. Connect GitHub first." });
+    return;
+  }
+  // CSRF defense for the cookie-authenticated route: cross-site requests
+  // carry a mismatching Origin header and are rejected.
+  if (!originMatchesHost(req)) {
+    res.status(403).json({ error: "Cross-origin request rejected" });
+    return;
+  }
+
+  const { repo, path: filePath, content, message } = req.body;
+
+  if (!repo || !filePath || !content) {
+    res.status(400).json({ error: "Missing required fields: repo, path, content" });
     return;
   }
 
@@ -1466,7 +1572,7 @@ app.post("/api/github/sync", async (req: Request, res: Response) => {
     // Get current file SHA if it exists (needed for updates)
     const getRes = await fetch(`https://api.github.com/repos/${safeRepo}/contents/${safePath}`, {
       headers: {
-        Authorization: `Bearer ${token}`,
+        Authorization: `Bearer ${session.githubToken}`,
         Accept: "application/vnd.github.v3+json",
       },
     });
@@ -1481,7 +1587,7 @@ app.post("/api/github/sync", async (req: Request, res: Response) => {
     const putRes = await fetch(`https://api.github.com/repos/${safeRepo}/contents/${safePath}`, {
       method: "PUT",
       headers: {
-        Authorization: `Bearer ${token}`,
+        Authorization: `Bearer ${session.githubToken}`,
         "Content-Type": "application/json",
         Accept: "application/vnd.github.v3+json",
       },

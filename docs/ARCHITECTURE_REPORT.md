@@ -17,6 +17,13 @@
 > **Authors & Engineering:** VECTORA System Core Engineering  
 > **Documentation Target:** `/docs/ARCHITECTURE_REPORT.md`  
 
+> ⚠️ **Accuracy notice (2026-09-21):** This report was written as an aspirational
+> marketing/architecture document and **overstates implementation maturity** in places.
+> For the verified, tested state of each capability, see **`docs/AUDIT.md`** — including
+> the feature-status matrix and the Phase 0 stabilization changes (SVG sanitization,
+> OAuth hardening, server-side sessions, rate limiting, runtime AI contracts, layer
+> persistence fixes, test suite, and CI).
+
 ---
 
 ## 1. Executive Summary & Design Philosophy
@@ -47,7 +54,7 @@ VECTORA was designed under strict aesthetic and engineering mandates:
 |                             CLIENT-SIDE ARCHITECTURE                          |
 |                                                                               |
 |  +-------------------------------------------------------------------------+  |
-|  |                           React 18.3 (TypeScript)                       |  |
+|  |                           React 19 (TypeScript)                        |  |
 |  |   - Declarative reactive state management (Layers, AST, Canvas, Presets)|  |
 |  |   - Modular component hierarchy & custom hooks                          |  |
 |  +-------------------------------------------------------------------------+  |
@@ -88,7 +95,7 @@ VECTORA was designed under strict aesthetic and engineering mandates:
 ```
 
 ### 2.1 React & TypeScript
-- Built with **React 18.3** utilizing strictly typed interfaces (`src/types.ts`) for artwork data structures, layer nodes, canvas viewport transformations, export profiles, and generative payloads.
+- Built with **React 19** utilizing strictly typed interfaces (`src/types.ts`) for artwork data structures, layer nodes, canvas viewport transformations, export profiles, and generative payloads.
 - State is compartmentalized to prevent unnecessary re-renders during high-frequency zoom and pan operations.
 
 ### 2.2 Tailwind CSS

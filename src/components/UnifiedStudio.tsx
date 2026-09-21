@@ -19,6 +19,15 @@ import { ImportModal } from './ImportModal';
 import { RefinePromptBar } from './RefinePromptBar';
 import { CanvasSettings, LayerSpec, VectorArtwork } from '../types';
 import { exportSvgToPng, downloadBlob } from '../utils/svgParser';
+import {
+  setSvgLayerVisibility,
+  setSvgLayerLock,
+  renameSvgLayer,
+  reorderSvgLayer,
+  addNewSvgLayer,
+  setSvgLayerBlendMode,
+  remapSvgColors,
+} from '../utils/svgParser';
 
 interface UnifiedStudioProps {
   artwork: VectorArtwork;
@@ -41,7 +50,9 @@ export const UnifiedStudio: React.FC<UnifiedStudioProps> = ({
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [chatMessage, setChatMessage] = useState('');
   const [isRefining, setIsRefining] = useState(false);
-  const [githubToken, setGithubToken] = useState<string | null>(localStorage.getItem('github_token'));
+  // GitHub connection state. The OAuth token lives in a server-side session
+  // (HTTP-only cookie) — the browser never stores or handles the raw token.
+  const [githubConnected, setGithubConnected] = useState(false);
   
   // Real Layer State
   const [layers, setLayers] = useState<LayerSpec[]>(artwork.layers || []);
@@ -102,33 +113,113 @@ export const UnifiedStudio: React.FC<UnifiedStudioProps> = ({
     setLayers(newLayers);
   };
 
+  /**
+   * Apply a mutation to the SVG document itself (not just React state) and
+   * record it on the undo/redo stack. Layer operations MUST go through
+   * this so that exports, code view, reloads, and the canvas all agree —
+   * previously visibility/lock/rename only mutated React state, so the
+   * exported SVG silently disagreed with what the user saw.
+   */
+  const applySvgMutation = (mutate: (svg: string) => string) => {
+    const nextSvg = mutate(artwork.svg);
+    if (nextSvg && nextSvg !== artwork.svg) {
+      handleUpdateSvgWithHistory(nextSvg);
+    }
+  };
+
   const handleToggleLayer = (name: string) => {
-    const newLayers = layers.map((l) => (l.name === name ? { ...l, visible: !l.visible } : l));
-    handleUpdateLayers(newLayers);
+    const layer = layers.find((l) => l.name === name);
+    const nextVisible = layer ? !layer.visible : true;
+    // Persist visibility into the SVG document (display="none") so exports match the canvas.
+    applySvgMutation((svg) => setSvgLayerVisibility(svg, name, nextVisible));
+    handleUpdateLayers(layers.map((l) => (l.name === name ? { ...l, visible: nextVisible } : l)));
   };
 
   const handleToggleLock = (name: string) => {
-    const newLayers = layers.map((l) => (l.name === name ? { ...l, locked: !l.locked } : l));
-    handleUpdateLayers(newLayers);
+    const layer = layers.find((l) => l.name === name);
+    const nextLocked = layer ? !layer.locked : true;
+    // Persist the lock flag into the SVG document as well.
+    applySvgMutation((svg) => setSvgLayerLock(svg, name, nextLocked));
+    handleUpdateLayers(layers.map((l) => (l.name === name ? { ...l, locked: nextLocked } : l)));
   };
 
   const handleRenameLayer = (oldName: string, newName: string) => {
-    const newLayers = layers.map((l) => (l.name === oldName ? { ...l, name: newName } : l));
-    handleUpdateLayers(newLayers);
+    if (!newName.trim() || oldName === newName) return;
+    // Rename in the SVG document (inkscape:label / id) so labels are not cosmetic-only.
+    applySvgMutation((svg) => renameSvgLayer(svg, oldName, newName));
+    handleUpdateLayers(layers.map((l) => (l.name === oldName ? { ...l, name: newName } : l)));
   };
 
   const handleSoloLayer = (name: string) => {
-    const newLayers = layers.map((l) => ({ ...l, visible: l.name === name }));
-    handleUpdateLayers(newLayers);
+    const next = layers.map((l) => ({ ...l, visible: l.name === name }));
+    // Persist every layer's visibility into the SVG document.
+    applySvgMutation((svg) =>
+      next.reduce((acc, l) => setSvgLayerVisibility(acc, l.name, l.visible), svg),
+    );
+    handleUpdateLayers(next);
   };
 
   const handleShowAllLayers = () => {
-    const newLayers = layers.map((l) => ({ ...l, visible: true }));
+    const next = layers.map((l) => ({ ...l, visible: true }));
+    applySvgMutation((svg) =>
+      next.reduce((acc, l) => setSvgLayerVisibility(acc, l.name, l.visible), svg),
+    );
+    handleUpdateLayers(next);
+  };
+
+  /**
+   * Reorder layers by name + direction. LayerPanel invokes this with
+   * (layerName, 'up' | 'down'); the previous implementation treated the
+   * arguments as numeric indexes, which corrupted the layer array.
+   *
+   * Ordering convention (matches reorderSvgLayer and the panel): the layers
+   * array is in document/draw order — index 0 paints first (back), the last
+   * index paints last (front). "Up"/Bring Forward therefore moves a layer to
+   * a LATER index, "down"/Send Backward to an earlier one.
+   */
+  const handleReorderLayer = (layerName: string, direction: 'up' | 'down' | 'top' | 'bottom') => {
+    const index = layers.findIndex((l) => l.name === layerName);
+    if (index === -1) return;
+    let targetIndex = index;
+    if (direction === 'up') targetIndex = Math.min(layers.length - 1, index + 1);
+    else if (direction === 'down') targetIndex = Math.max(0, index - 1);
+    else if (direction === 'top') targetIndex = layers.length - 1;
+    else if (direction === 'bottom') targetIndex = 0;
+    if (targetIndex === index) return;
+
+    const newLayers = [...layers];
+    const [moved] = newLayers.splice(index, 1);
+    newLayers.splice(targetIndex, 0, moved);
+    // Persist draw-order change into the SVG document.
+    applySvgMutation((svg) => reorderSvgLayer(svg, layerName, direction));
     handleUpdateLayers(newLayers);
   };
 
+  const handleAddNewLayer = () => {
+    const name = `Layer ${layers.length + 1}`;
+    // Insert the layer group into the SVG document too ('top' = front of the
+    // stack = end of the document order).
+    applySvgMutation((svg) => addNewSvgLayer(svg, name, 'top'));
+    handleUpdateLayers([...layers, { name, visible: true, locked: false, opacity: 1, blendMode: 'normal' }]);
+  };
+
+  const handleSetBlendMode = (name: string, mode: string) => {
+    applySvgMutation((svg) => setSvgLayerBlendMode(svg, name, mode));
+    handleUpdateLayers(layers.map((l) => (l.name === name ? { ...l, blendMode: mode } : l)));
+  };
+
+  /**
+   * Apply a palette locally and deterministically by remapping the colors
+   * present in the SVG document. This used to round-trip through the AI
+   * (nondeterministic, network-dependent); now it is a local, undoable
+   * document mutation.
+   */
   const handleApplyPalette = (colors: string[]) => {
-    handleRefine(`Apply this color palette to the design: ${colors.join(', ')}`);
+    if (!colors?.length) return;
+    applySvgMutation((svg) => remapSvgColors(svg, colors));
+    toast.success('Palette applied to document', {
+      description: `${colors.length} colors remapped locally (undoable)`,
+    });
   };
 
   // Handle downloadable SVG export
@@ -247,22 +338,43 @@ export const UnifiedStudio: React.FC<UnifiedStudioProps> = ({
     }
   };
 
+  // On mount, check whether a server-side GitHub session is still alive.
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/auth/github/status')
+      .then((res) => (res.ok ? res.json() : { connected: false }))
+      .then((data) => {
+        if (!cancelled) setGithubConnected(!!data.connected);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const connectGitHub = async () => {
     const res = await fetch('/api/auth/github/url');
     const { url } = await res.json();
-    const popup = window.open(url, 'github-auth', 'width=600,height=700');
-    
+    window.open(url, 'github-auth', 'width=600,height=700');
+
     window.addEventListener('message', (event) => {
-      if (event.data.type === 'GITHUB_AUTH_SUCCESS') {
-        const token = event.data.token;
-        setGithubToken(token);
-        localStorage.setItem('github_token', token);
+      // Only trust same-origin messages from our own OAuth callback page.
+      if (event.origin !== window.location.origin) return;
+      if (event.data?.type === 'GITHUB_AUTH_SUCCESS') {
+        // The token stays server-side; the callback only signals success.
+        setGithubConnected(true);
       }
     }, { once: true });
   };
 
+  const disconnectGitHub = async () => {
+    await fetch('/api/auth/github/logout', { method: 'POST' }).catch(() => {});
+    setGithubConnected(false);
+    toast.info('GitHub disconnected');
+  };
+
   const syncToGitHub = async () => {
-    if (!githubToken) {
+    if (!githubConnected) {
       connectGitHub();
       return;
     }
@@ -275,16 +387,21 @@ export const UnifiedStudio: React.FC<UnifiedStudioProps> = ({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          token: githubToken,
           repo,
           path: `designs/${artwork.title.toLowerCase().replace(/\s+/g, '-')}.svg`,
           content: artwork.svg,
           message: `Update design: ${artwork.title}`
         }),
       });
+      if (response.status === 401) {
+        // Session expired or revoked — reconnect.
+        setGithubConnected(false);
+        toast.error('GitHub session expired', { description: 'Please reconnect and try again.' });
+        return;
+      }
       const result = await response.json();
       if (result.success) {
-        alert("Synced to GitHub successfully!");
+        toast.success('Synced to GitHub successfully!');
       }
     } catch (err) {
       console.error('Sync failed:', err);
@@ -323,9 +440,9 @@ export const UnifiedStudio: React.FC<UnifiedStudioProps> = ({
         
         <div className="mt-auto border-t border-white/5 pt-4 space-y-4 relative">
           <button 
-            onClick={syncToGitHub}
-            className={`transition-colors ${githubToken ? 'text-blue-400' : 'text-white/40 hover:text-white'}`}
-            title={githubToken ? "Sync to GitHub" : "Connect GitHub"}
+            onClick={(e) => (e.shiftKey ? disconnectGitHub() : syncToGitHub())}
+            className={`transition-colors ${githubConnected ? 'text-blue-400' : 'text-white/40 hover:text-white'}`}
+            title={githubConnected ? "Sync to GitHub (Shift+click to disconnect)" : "Connect GitHub"}
           >
             <Github size={20} />
           </button>
@@ -488,19 +605,9 @@ export const UnifiedStudio: React.FC<UnifiedStudioProps> = ({
                   onSoloLayer={handleSoloLayer}
                   onShowAllLayers={handleShowAllLayers}
                   onClose={() => setActiveTool(null)} 
-                  onReorderLayer={(from, to) => {
-                    const newLayers = [...layers];
-                    const [moved] = newLayers.splice(from, 1);
-                    newLayers.splice(to, 0, moved);
-                    handleUpdateLayers(newLayers);
-                  }}
-                  onAddNewLayer={() => {
-                    const name = `Layer ${layers.length + 1}`;
-                    handleUpdateLayers([...layers, { name, visible: true, locked: false, opacity: 1, blendMode: 'normal' }]);
-                  }}
-                  onSetBlendMode={(name, mode) => {
-                    handleUpdateLayers(layers.map(l => l.name === name ? { ...l, blendMode: mode } : l));
-                  }}
+                  onReorderLayer={handleReorderLayer}
+                  onAddNewLayer={handleAddNewLayer}
+                  onSetBlendMode={handleSetBlendMode}
                 />
               )}
               {activeTool === 'colors' && (
