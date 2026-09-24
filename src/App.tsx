@@ -6,6 +6,7 @@ import { HomeView } from './components/HomeView';
 import { UnifiedStudio } from './components/UnifiedStudio';
 import { MasterpieceGallery } from './components/MasterpieceGallery';
 import { HistoryView } from './components/HistoryView';
+import { EncyclopediaView } from './components/EncyclopediaView';
 import { GenerationLoader } from './components/GenerationLoader';
 import { CommandPalette } from './components/CommandPalette';
 import { KeyboardShortcutsModal } from './components/KeyboardShortcutsModal';
@@ -16,7 +17,7 @@ import { Keyboard, Command } from 'lucide-react';
 
 export default function App() {
   const [showIntro, setShowIntro] = useState(false);
-  const [activeView, setActiveView] = useState<'home' | 'studio' | 'gallery' | 'history'>('studio');
+  const [activeView, setActiveView] = useState<'home' | 'studio' | 'gallery' | 'history' | 'encyclopedia'>('studio');
   const [isSidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [currentPrompt, setCurrentPrompt] = useState('');
@@ -130,6 +131,7 @@ export default function App() {
         toast.info('Workspace: Masterpiece Gallery', { description: 'Shortcut: Ctrl+3' });
         return;
       }
+      if (isCmdOrCtrl && e.key === '5') { e.preventDefault(); setActiveView('encyclopedia'); toast.info('Workspace: Master Encyclopedia'); return; }
       if (isCmdOrCtrl && e.key === '4') {
         e.preventDefault();
         setActiveView('history');
@@ -353,6 +355,12 @@ export default function App() {
                   setActiveView('studio');
                 }} 
               />
+            </motion.div>
+          )}
+
+          {activeView === 'encyclopedia' && (
+            <motion.div key="encyclopedia" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 20 }} className="h-full">
+              <EncyclopediaView />
             </motion.div>
           )}
 
