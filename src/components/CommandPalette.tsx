@@ -21,7 +21,7 @@ import { VectorArtwork } from '../types';
 interface CommandPaletteProps {
   isOpen: boolean;
   onClose: () => void;
-  onSelectView: (view: 'home' | 'studio' | 'gallery' | 'history') => void;
+  onSelectView: (view: 'home' | 'studio' | 'gallery' | 'history' | 'encyclopedia') => void;
   onQuickGenerate?: (prompt: string) => void;
   onDownloadSvg?: () => void;
   onDownloadPng?: () => void;

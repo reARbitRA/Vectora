@@ -1,0 +1,5 @@
+export interface Genome { genes:number[] }
+export interface EvolutionOptions { population?:number; generations?:number; mutation?:number; seed?:number; fitness:(genome:Genome)=>number; onProgress?:(percent:number)=>void }
+/** Generic no-GPU evolutionary optimizer used by EvoVec adapters. */
+export function evolve(options:EvolutionOptions):Genome {const n=options.population??32,g=options.generations??100,rate=options.mutation??.15,r=mulberry32(options.seed??3);let pop=Array.from({length:n},()=>({genes:Array.from({length:12},()=>r())}));for(let gen=0;gen<g;gen++){pop.sort((a,b)=>options.fitness(b)-options.fitness(a));const next=pop.slice(0,Math.max(2,Math.floor(n*.2)));while(next.length<n){const parent=next[Math.floor(r()*next.length)], child={genes:parent.genes.map(v=>r()<rate?Math.max(0,Math.min(1,v+(r()-.5)*.2)):v)};next.push(child)}pop=next;options.onProgress?.((gen+1)/g*100)}return pop.sort((a,b)=>options.fitness(b)-options.fitness(a))[0]}
+function mulberry32(seed:number){return()=>{let t=seed+=0x6D2B79F5;t=Math.imul(t^t>>>15,t|1);t^=t+Math.imul(t^t>>>7,t|61);return((t^t>>>14)>>>0)/4294967296}}

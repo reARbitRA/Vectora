@@ -1,0 +1,4 @@
+export interface NeuralVectorizerRequest { image?:string; prompt?:string; options?:Record<string,unknown> }
+export interface NeuralVectorizerProvider { id:string; endpoint:string; headers?:Record<string,string> }
+/** Secure client adapter: credentials stay server-side; the bridge only speaks JSON. */
+export async function callNeuralProvider(provider:NeuralVectorizerProvider, request:NeuralVectorizerRequest, signal?:AbortSignal):Promise<{svg:string;metadata?:Record<string,unknown>}>{const response=await fetch(provider.endpoint,{method:'POST',headers:{'Content-Type':'application/json',...(provider.headers??{})},body:JSON.stringify(request),signal});if(!response.ok)throw new Error(`${provider.id} vectorization failed (${response.status})`);const data=await response.json();if(typeof data.svg!=='string')throw new Error(`${provider.id} returned no SVG`);return data}

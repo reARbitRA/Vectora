@@ -1,0 +1,2 @@
+export function smilAnimate(attributeName:string,values:string,dur='1s',extra:Record<string,string>={}){const attrs={attributeName,values,dur,fill:'freeze',...extra};return `<animate ${Object.entries(attrs).map(([k,v])=>`${k}="${v.replace(/"/g,'&quot;')}"`).join(' ')}/>`;}
+export function smilTransform(type:'translate'|'rotate'|'scale',values:string,dur='1s'){return smilAnimate('transform',values,dur,{type});}

@@ -1,0 +1,2 @@
+export function wavePath(width:number,height:number,amplitude:number,cycles:number,phase:number,step=10):string{let d=`M 0 ${(height/2+amplitude*Math.sin(phase)).toFixed(2)}`;for(let x=step;x<=width;x+=step)d+=` L ${x} ${(height/2+amplitude*Math.sin(x/width*cycles*Math.PI*2+phase)).toFixed(2)}`;return d;}
+export function waveKeyframes(width:number,height:number,amplitude:number,cycles:number,count=8){return Array.from({length:count},(_,i)=>wavePath(width,height,amplitude,cycles,i/ count*Math.PI*2));}

@@ -329,3 +329,7 @@ export function floydSteinbergDither(
 
   return { width, height, data: output };
 }
+
+/** Convenience aliases used by the public encyclopedia API. */
+export function grayscale(image: ImageData): Float32Array { return imageToGrayscale(image).data; }
+export function sobel(values: Float32Array,width:number,height:number){ const g=sobelFilter({width,height,data:values}); return {gx:new Float32Array(values.length),gy:new Float32Array(values.length),magnitude:g.magnitude}; }

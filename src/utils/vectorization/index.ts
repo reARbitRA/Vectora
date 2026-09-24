@@ -17,6 +17,11 @@ import { traceCrossHatch, CrossHatchOptions } from './crossHatchTracer';
 import { traceTSPSingleLine, TSPOptions } from './tspArtTracer';
 import { traceCannyEdges, CannyTracerOptions } from './cannyLineTracer';
 import { VectorArtwork } from '../../types';
+import { traceMarchingSquares } from './marchingSquares';
+import { approximateFourier } from './fourierApproximator';
+import { traceSobelGradients } from './sobelGradientTracer';
+import { traceSlic } from './slicSuperpixels';
+import { detectHarrisCorners } from './featureDetectors';
 
 export {
   traceCenterline,
@@ -60,7 +65,8 @@ export type VectorizationTechniqueId =
   | 'isometric-voxel'
   | 'cross-hatch'
   | 'tsp-single-line'
-  | 'canny-blueprint';
+  | 'canny-blueprint'
+  | 'marching-squares' | 'sobel-gradient' | 'fourier-contour' | 'slic-superpixel' | 'harris-corners';
 
 export interface VectorizationMeta {
   id: VectorizationTechniqueId;
@@ -163,6 +169,13 @@ export const VECTORIZATION_TECHNIQUES: VectorizationMeta[] = [
     icon: 'Cpu',
     bestFor: 'Technical blueprints, CAD schematics, cybernetic HUDs & wireframes',
   },
+  { id: 'slic-superpixel', name: 'SLIC Superpixels', category: 'Color & Low-Poly', tagline: 'Lab-space photo mosaic', description: 'Clusters pixels in color and spatial space into editable superpixel regions.', icon: 'Grid3X3', bestFor: 'Portrait mosaics and painterly photo vectorization' },
+  { id: 'harris-corners', name: 'Harris Corner Field', category: 'Contour & Line Art', tagline: 'Structural anchor detection', description: 'Extracts high-response image corners as editable SVG anchors.', icon: 'Crosshair', bestFor: 'Wireframes, sparse graphics and geometric anchors' },
+  {
+    id: 'marching-squares', name: 'Marching Squares Isolines', category: 'Contour & Line Art', tagline: 'Multi-level scalar field contours', description: 'Extracts smooth threshold isolines from raster luminance using interpolated 16-case marching squares.', icon: 'Waves', bestFor: 'Maps, topographic art, data visualization & contour engraving',
+  },
+  { id: 'sobel-gradient', name: 'Sobel Gradient Field', category: 'Contour & Line Art', tagline: 'Directional gradient micro-strokes', description: 'Converts local Sobel gradient orientation into directional SVG linework.', icon: 'Activity', bestFor: 'Blueprints, etched textures and directional analysis', },
+  { id: 'fourier-contour', name: 'Fourier Epicycle Contour', category: 'Experimental & 3D', tagline: 'Frequency-domain contour reconstruction', description: 'Compresses closed contours into editable harmonic coefficients for smooth paths and epicycle animation.', icon: 'Activity', bestFor: 'Logo approximation, mathematical art and drawing demos', },
   {
     id: 'isometric-voxel',
     name: 'Isometric Voxel 3D',
@@ -307,6 +320,11 @@ export function runVectorization(
       rawSvg = res.svg;
       break;
     }
+    case 'slic-superpixel': rawSvg = traceSlic(imageData, { count: options.pointCount || 160 }).svg; break;
+    case 'harris-corners': rawSvg = detectHarrisCorners(imageData, .25).svg; break;
+    case 'marching-squares': rawSvg = traceMarchingSquares(imageData, { levels: options.colorCount || 8, strokeColor: options.strokeColor || '#00FFFF', strokeWidth: options.strokeWidth || 1, backgroundColor: options.backgroundColor || '#05070A' }).svg; break;
+    case 'sobel-gradient': rawSvg = traceSobelGradients(imageData, .12, options.strokeColor || '#00FFFF').svg; break;
+    case 'fourier-contour': { const pts=[]; for(let y=0;y<imageData.height;y+=Math.max(1,Math.floor(imageData.height/32))) for(let x=0;x<imageData.width;x+=Math.max(1,Math.floor(imageData.width/32))) pts.push({x,y}); rawSvg=approximateFourier(pts,{harmonics:options.pointCount||24,strokeColor:options.strokeColor}).svg; break; }
     case 'isometric-voxel': {
       const res = traceIsometricVoxels(imageData, {
         voxelSize: options.gridSize || 14,
@@ -363,3 +381,18 @@ export function runVectorization(
 
   return { artwork, rawSvg };
 }
+
+// Production facade (kept in a separate module to avoid making the algorithm registry circular).
+export { VectorizationEngine, techniqueCatalog } from './engine';
+export type { VectorizationOptions, VectorizationResult } from './engine';
+export { traceMarchingSquares } from './marchingSquares';
+export { approximateFourier } from './fourierApproximator';
+export { traceSobelGradients } from './sobelGradientTracer';
+export { optimizeRasterToSvg } from './optimization/diffvgOptimizer';
+export { evolve } from './optimization/evolutionaryBase';
+export { callNeuralProvider } from './neural/neuralVectorizerBase';
+export type { OptimizerOptions, OptimizedPrimitive } from './optimization/diffvgOptimizer';
+export type { EvolutionOptions, Genome } from './optimization/evolutionaryBase';
+
+export { traceSlic } from './slicSuperpixels';
+export { detectHarrisCorners } from './featureDetectors';

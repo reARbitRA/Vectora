@@ -3,14 +3,14 @@ import { motion, AnimatePresence } from 'motion/react';
 import { 
   Menu, X, LayoutGrid, Plus, History, Settings, Github, 
   HelpCircle, ChevronLeft, ChevronRight, User, LogOut,
-  PenTool, Sparkles, Command
+  PenTool, Sparkles, Command, BookOpen
 } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface MainLayoutProps {
   children: React.ReactNode;
-  activeView: 'home' | 'studio' | 'gallery' | 'history';
-  onViewChange: (view: 'home' | 'studio' | 'gallery' | 'history') => void;
+  activeView: 'home' | 'studio' | 'gallery' | 'history' | 'encyclopedia';
+  onViewChange: (view: 'home' | 'studio' | 'gallery' | 'history' | 'encyclopedia') => void;
   isSidebarCollapsed: boolean;
   setSidebarCollapsed: (collapsed: boolean) => void;
   artworkTitle?: string;
@@ -35,6 +35,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
     { id: 'home', icon: Sparkles, label: 'Synthesize' },
     { id: 'gallery', icon: LayoutGrid, label: 'Gallery' },
     { id: 'history', icon: History, label: 'History' },
+    { id: 'encyclopedia', icon: BookOpen, label: 'Encyclopedia' },
   ];
 
   const handleGithubSync = () => {
@@ -58,6 +59,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
     home: 'AI Synthesis Studio',
     gallery: 'Curated Masterpieces',
     history: 'Session History',
+    encyclopedia: 'Master Encyclopedia',
   };
 
   return (

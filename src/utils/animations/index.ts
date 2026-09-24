@@ -296,10 +296,25 @@ export const COMPLETE_ANIMATION_PRESETS: ExtendedAnimationPresetMeta[] = [
   },
 ];
 
+/** Modern browser and production toolchain presets (AG/N/O encyclopedia). */
+export const MODERN_ANIMATION_PRESETS: ExtendedAnimationPresetMeta[] = [
+  ['scroll-driven-draw','Scroll-driven Signature Draw','CSS scroll timeline','Draws paths as the document scrolls','PenTool','Reveal & Draw','Scroll timeline + normalized dashoffset'],
+  ['stagger-intersection','Intersection Stagger','Viewport-triggered cascade','Reveals layers when they enter the viewport','Layers','Kinetic & Physics','IntersectionObserver + --i'],
+  ['gsap-morph-state','MorphSVG State Machine','Any-shape icon states','Adapter preset for robust unequal-path morphing','Activity','Morph & Transform','GSAP MorphSVG bridge'],
+  ['spring-physics','Spring Physics Motion','Interruptible natural motion','Physics-based transforms for responsive UI','Activity','Kinetic & Physics','spring tension and friction'],
+  ['filter-composition','Filter Composition','Animated effect stack','Composes blur, color and displacement filters','Waves','Color & Gradient','filter primitive pipeline'],
+  ['gsap-timeline','GSAP Timeline Scene','Multi-step orchestration','Exportable scene choreography with labels','Film','Advanced Cinematic','timeline orchestration'],
+  ['variable-font','Variable Font Animation','Animated type axes','Animates SVG text font variation settings','Copy','Color & Gradient','font-variation-settings'],
+  ['view-transition','View Transition Morph','Native page transition','Names SVG elements for cross-document transitions','Layers','Advanced Cinematic','View Transitions API'],
+  ['lottie-export','Lottie Export Pipeline','Portable animation interchange','Prepares supported SVG motion for Lottie tooling','Download','Advanced Cinematic','Lottie/dotLottie adapter'],
+].map(([id,name,tagline,description,icon,category,trick])=>({id:id as AnimationPresetId,name,tagline,description,icon,recommendedDuration:2.5,bestFor:'Modern production web animation',category:category as ExtendedAnimationPresetMeta['category'],trick}));
+
 // Preset ID Named Constants & Aliases
 export const penDrawOn = 'pen-draw-on';
 export const wipeReveal = 'wipe-reveal';
 export const elasticBounce = 'elastic-bounce';
+
+export const ALL_ANIMATION_PRESETS = [...COMPLETE_ANIMATION_PRESETS, ...MODERN_ANIMATION_PRESETS];
 
 export const ANIMATION_PRESET_ALIASES: Record<string, AnimationPresetId> = {
   penDrawOn: 'pen-draw-on',
@@ -381,7 +396,14 @@ export function injectExtendedAnimation(rawSvg: string, config: AnimationConfig)
       styleEl = newStyle;
     }
 
-    styleEl.textContent = `\n${keyframeRules.join('\n')}\n`;
+    const modernRules: Record<string, string> = {
+      'scroll-driven-draw': `.vec-anim-scroll-driven-draw path { pathLength: 1; stroke-dasharray: 1; stroke-dashoffset: 1; animation: vec-kf-pen-draw-on linear ${loopIteration}; animation-timeline: scroll(root block); }`,
+      'stagger-intersection': `.vec-anim-stagger-intersection > * { opacity: 0; transform: translateY(20px); animation: vec-kf-domino-rise ${baseDuration}s ${easing} forwards; animation-delay: calc(var(--i, 0) * 80ms); }`,
+      'spring-physics': `.vec-anim-spring-physics { transition: transform ${baseDuration}s cubic-bezier(.175,.885,.32,1.275); }`,
+      'variable-font': `.vec-anim-variable-font text { animation: vec-kf-variable-font ${baseDuration}s ease-in-out infinite alternate; } @keyframes vec-kf-variable-font { to { font-variation-settings: 'wght' 900, 'wdth' 110; } }`,
+      'view-transition': `.vec-anim-view-transition { view-transition-name: vectora-element; }`,
+    };
+    styleEl.textContent = `\n${keyframeRules.join('\n')}\n${modernRules[presetId] || ''}\n\n@media (prefers-reduced-motion: reduce) { .vec-anim-${presetId}, .vec-anim-${presetId} * { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; } }`;
 
     const serializer = new XMLSerializer();
     return serializer.serializeToString(doc);
@@ -390,3 +412,8 @@ export function injectExtendedAnimation(rawSvg: string, config: AnimationConfig)
     return rawSvg;
   }
 }
+
+export { AnimationEngine } from './runtime';
+export type { AnimationOptions } from './runtime';
+export { wavePath, waveKeyframes } from './helpers/waveGenerator';
+export { observeStagger } from './helpers/intersectionStagger';
