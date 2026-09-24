@@ -140,7 +140,9 @@ export type AnimationPresetId =
   | 'camera-dolly'
   | 'lightning-strike'
   | 'assembling-puzzle'
-  | 'liquid-fill';
+  | 'liquid-fill'
+  | 'scroll-driven-draw' | 'stagger-intersection' | 'gsap-morph-state' | 'spring-physics'
+  | 'filter-composition' | 'gsap-timeline' | 'variable-font' | 'view-transition' | 'lottie-export';
 
 export type AnimationLoopMode = 'infinite' | 'once' | 'alternate';
 

@@ -1,0 +1,3 @@
+/** Normalize polygon samples for stable morphing without a dependency. */
+import {Point} from './curveFitting';
+export function resample(points:Point[], count:number, closed=true):Point[]{if(!points.length)return [];const src=closed?points.concat([points[0]]):points.slice(), lengths=[0];for(let i=1;i<src.length;i++)lengths[i]=lengths[i-1]+Math.hypot(src[i].x-src[i-1].x,src[i].y-src[i-1].y);const total=lengths.at(-1)!;return Array.from({length:count},(_,n)=>{const d=(n/count)*total;let i=1;while(i<lengths.length&&lengths[i]<d)i++;const t=(d-lengths[i-1])/(lengths[i]-lengths[i-1]||1);return{x:src[i-1].x+(src[i].x-src[i-1].x)*t,y:src[i-1].y+(src[i].y-src[i-1].y)*t};});}

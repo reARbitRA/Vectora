@@ -1,5 +1,5 @@
 import { AnimationConfig, AnimationLoopMode, AnimationPresetId, AnimationPresetMeta, AnimationSyncGroup, KeyframeNode, LayerAnimationConfig } from '../types';
-import { COMPLETE_ANIMATION_PRESETS, injectExtendedAnimation } from './animations';
+import { ALL_ANIMATION_PRESETS, injectExtendedAnimation } from './animations';
 
 export const ANIMATION_EASINGS: { id: string; name: string; curve: string; category: string }[] = [
   { id: 'ease-in-out', name: 'Ease In Out (Smooth)', curve: 'ease-in-out', category: 'Standard' },
@@ -254,7 +254,7 @@ export const ANIMATION_PRESETS: (AnimationPresetMeta & { defaults?: AnimationPre
     },
     bestFor: 'Abstract fluids, biological shapes & soundwaves',
   },
-  ...COMPLETE_ANIMATION_PRESETS.map((p) => ({
+  ...ALL_ANIMATION_PRESETS.map((p) => ({
     ...p,
     defaults: {
       easing: 'ease-in-out',
@@ -375,7 +375,7 @@ export function injectSvgAnimations(
   }
 
   // Check if active preset belongs to the 25-technique extended animation engine
-  if (COMPLETE_ANIMATION_PRESETS.some((p) => p.id === config.preset)) {
+  if (ALL_ANIMATION_PRESETS.some((p) => p.id === config.preset)) {
     const cleanSvg = removeSvgAnimations(rawSvg);
     return injectExtendedAnimation(cleanSvg, config);
   }

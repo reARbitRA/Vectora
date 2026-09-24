@@ -1,0 +1,3 @@
+export const escapeXml=(s:string)=>s.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&apos;'}[c]!));
+export function svgDocument(width:number,height:number,content:string,background='transparent',title='Vectora output'):string{return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" role="img" aria-label="${escapeXml(title)}"><title>${escapeXml(title)}</title>${background==='transparent'?'':`<rect width="100%" height="100%" fill="${background}"/>`}${content}</svg>`;}
+export const path=(d:string,attrs:Record<string,string>={})=>`<path d="${d}" ${Object.entries(attrs).map(([k,v])=>`${k}="${escapeXml(v)}"`).join(' ')}/>`;

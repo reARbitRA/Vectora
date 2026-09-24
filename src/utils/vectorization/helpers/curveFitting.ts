@@ -169,3 +169,10 @@ export function pointsToSvgPath(points: Point2D[], closed: boolean = false, smoo
   if (closed) d += ' Z';
   return d;
 }
+
+export interface Point { x:number; y:number }
+export const rdpSimplify = (points:Point[], epsilon=1):Point[] => simplifyRDP(points,epsilon);
+export function visvalingam(points:Point[], target=Math.max(3,Math.floor(points.length/2))):Point[]{const p=points.slice();while(p.length>target){let n=1,a=Infinity;for(let i=1;i<p.length-1;i++){const q=p[i-1],r=p[i],s=p[i+1],v=Math.abs((q.x*(r.y-s.y)+r.x*(s.y-q.y)+s.x*(q.y-r.y))/2);if(v<a){a=v;n=i;}}p.splice(n,1);}return p;}
+export const chaikin = (points:Point[], iterations=1, closed=false):Point[] => chaikinSmooth(points,iterations,closed);
+
+export function pointsToPath(points:Point[],close=false):string{return points.length?`M ${points.map((p,i)=>`${i?'L':' '}${p.x.toFixed(2)} ${p.y.toFixed(2)}`).join(' ')}${close?' Z':''}`:'';}
