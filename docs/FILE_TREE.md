@@ -15,24 +15,45 @@
 / (workspace-root)
 ├── .env.example                     # Environment variables schema and template
 ├── .gitignore                       # Git ignore declarations for build outputs & secrets
-├── .github/                         # CI quality gate (typecheck, tests, build)
-│   └── workflows/ci.yml             # GitHub Actions pipeline for pushes & pull requests
 ├── AGENTS.md                        # Persistent agent instructions and maintenance rules
 ├── VERIFICATION_REPORT.md           # System verification, stress-test audit & diagnostic logs
 ├── bun.lock                         # Bun runtime lockfile
 ├── index.html                       # HTML application entry point & Google Fonts loading
 ├── metadata.json                    # Application metadata, permissions & capabilities
 ├── package.json                     # Project manifest (vectora), npm dependencies & build scripts
-├── README.md                        # Honest project overview, setup & status summary
+├── README.md                        # Visual system README — generated diagrams + operations
 ├── server.ts                        # Express backend entry, routes & AI model orchestrator
 ├── server/                          # Server modules (Phase 0 stabilization split)
 │   ├── config.ts                    # Env-driven configuration (PORT, limits, rate budgets, TTLs)
 │   ├── ai/contracts.ts              # Runtime validation of AI JSON responses (schema + bounds)
 │   └── security/                    # svgGuard, rateLimit, oauthState, sessions modules
+├── scripts/                         # README asset pipeline (generation + verification)
+│   ├── generate-readme-assets.mjs   # Deterministic generator for every assets/readme/*.svg
+│   ├── verify-readme-assets.mjs     # XML / Camo-safety / path + anchor verifier for README.md
+│   └── readme-assets/               # Builder modules — single source of truth for README diagrams
+│       ├── kit.mjs                  # Design tokens, layout primitives & bounds assertions
+│       ├── assets-core.mjs          # Hero, status bar, scene graph, document engine, command history
+│       └── assets-flow.mjs          # Vectorization matrix, pipelines, gates, console, deployment, footer
 ├── tsconfig.json                    # TypeScript compiler configuration & path definitions
 ├── verify_system.ts                 # Automated end-to-end backend verification script
 ├── vite.config.ts                   # Vite bundler configuration & Tailwind integration
 ├── vitest.config.ts                 # Test runner configuration (node + jsdom environments)
+│
+├── assets/                          # Repository documentation assets (not app-bundled)
+│   └── readme/                      # 13 generated SVG diagrams referenced by README.md
+│       ├── hero.svg                 # Animated hero — wordmark, drawing paths, raster→vector motif
+│       ├── status-bar.svg           # Verification / engine / vectorization / motion / export strip
+│       ├── scene-graph.svg          # Typed scene graph with stable uids & namespace notes
+│       ├── document-engine.svg      # Surfaces → engine → derived views diagram
+│       ├── command-history.svg      # Transactional undo/redo stack visualization
+│       ├── vectorization-matrix.svg # 14-engine matrix across four families
+│       ├── raster-pipeline.svg      # Raster → semantic SVG client-side pipeline
+│       ├── ai-pipeline.svg          # Server-orchestrated AI synthesis flow
+│       ├── security-gate.svg        # Dual SVG gate (server svgGuard + client sanitizer)
+│       ├── export-rail.svg          # Six-lane export rail (SVG/PNG/React/CSS/GIF/sprites)
+│       ├── verification-console.svg # 147-test console with per-domain totals
+│       ├── deployment.svg           # Client / server / external deployment planes
+│       └── footer.svg               # Doctrine footer
 │
 ├── docs/                            # Technical reports & system architecture documentation
 │   ├── APP_REPORT.md                # Comprehensive feature matrix & application report
@@ -101,10 +122,10 @@
     │   └── vectoraBasePalette.ts    # Design system foundational colors and contrast tokens
     │
     └── utils/                       # Vector math, parsing, rendering & animation utilities
-        ├── animations/              # Modular 25-technique kinetic animation engine
+        ├── animations/              # Modular kinetic animation engine (24 core presets + 9 modern adapters)
         │   ├── helpers/
         │   │   ├── clipPathBuilder.ts   # Procedural SVG <clipPath> masks, wipes & iris definitions
-        │   │   └── keyframeGenerator.ts # CSS keyframes for 25 production SVG animation techniques
+        │   │   └── keyframeGenerator.ts # CSS keyframes for the production SVG animation arsenal
         │   └── index.ts             # Master animation preset registry & procedural SVG injector
         ├── gifRenderer.ts           # HTML5 Canvas frame-by-frame animated GIF exporter
         ├── spriteSheetRenderer.ts   # Multi-row vector animation sprite sheet generator
@@ -112,20 +133,30 @@
         ├── svgAnimator.ts           # Kinetic SVG animation injection & CSS keyframe engine
         ├── svgParser.ts             # Semantic SVG DOM parser, layer extractor & node counter
         ├── __tests__/               # Sanitizer XSS-vector & layer-persistence regression suites
-        └── vectorization/           # 12-engine client-side raster-to-SVG vectorization suite
-            ├── asciiMatrixTracer.ts     # Monospace ASCII terminal matrix vector renderer
-            ├── cannyLineTracer.ts       # Canny edge detector & architectural blueprint tracer
+        └── vectorization/           # 14 client-side tracing engines + experimental primitives
+            ├── index.ts                 # Unified vectorization orchestrator & technique registry
+            ├── engine.ts                # Stable async facade for UI, workers & future GPU/neural adapters
+            ├── centerlineTracer.ts      # Otsu + Zhang-Suen medial axis skeletonization
+            ├── regionTracer.ts          # Moore-neighbor region boundary (Potrace-style) tracer
+            ├── potraceTracer.ts         # Boundary polygon contour engine
             ├── colorQuantizer.ts        # K-means color posterization & multi-layer vector tracer
-            ├── contourIsolineTracer.ts  # Marching Squares elevation isoline topographic generator
-            ├── crossHatchTracer.ts      # Multi-angle intaglio sketch & cross-hatch line generator
-            ├── delaunayMeshTracer.ts    # Bowyer-Watson Delaunay triangulation low-poly mesh
-            ├── halftoneDotTracer.ts     # Pop-art CMYK-style variable radius halftone dot matrix
-            ├── index.ts                 # Unified vectorization orchestrator & preset catalog
-            ├── potraceTracer.ts         # Medial skeletonization & boundary polygon contour engine
-            ├── tspArtTracer.ts          # Traveling Salesperson single-unbroken-stroke continuous line art
-            ├── types.ts                 # Vectorization types, interfaces & algorithm option models
-            ├── voronoiStippler.ts       # Centroidal Voronoi / Lloyd-relaxed ink stippling engine
-            └── voxel3dTracer.ts         # 2.5D isometric shaded block & voxel vector projection
+            ├── delaunayTriangulator.ts  # Bowyer-Watson Delaunay low-poly mesh
+            ├── halftoneDither.ts        # Variable radius halftone dot matrix
+            ├── voronoiStippler.ts       # Lloyd-relaxed ink stippling engine
+            ├── contourExtractor.ts      # Marching Squares elevation isoline generator
+            ├── marchingSquares.ts       # Multi-level scalar-field isoline tracer
+            ├── crossHatchTracer.ts      # Multi-angle intaglio sketch & cross-hatch generator
+            ├── tspArtTracer.ts          # Traveling Salesperson single-unbroken-stroke tracer
+            ├── cannyLineTracer.ts       # Canny edge detector & architectural blueprint tracer
+            ├── sobelGradientTracer.ts   # Directional gradient micro-stroke tracer
+            ├── isometricVoxelTracer.ts  # 2.5D isometric shaded voxel projection
+            ├── asciiArtTracer.ts        # Monospace ASCII matrix vector typography
+            ├── slicSuperpixels.ts       # Lab-space superpixel clustering (experimental)
+            ├── featureDetectors.ts      # Harris corner field detection (experimental)
+            ├── fourierApproximator.ts   # Fourier epicycle contour reconstruction (experimental)
+            ├── optimization/            # diffvg-style optimizer & evolutionary base
+            ├── neural/                  # Neural vectorizer provider base
+            └── helpers/                 # Shared raster/vector primitives (image, curve, topology)
 ```
 
 ---
@@ -239,25 +270,45 @@ The authoritative editing model. SVG strings are inputs/outputs here, never the 
 | **`src/utils/svgAnimator.ts`** | Master SVG animation coordinator. Delegates extended animations to the modular kinetic engine while maintaining legacy preset compatibility. |
 | **`src/utils/gifRenderer.ts`** | Renders dynamic SVG animations frame-by-frame onto a hidden HTML5 canvas and compiles them into downloadable animated GIF binaries. |
 | **`src/utils/spriteSheetRenderer.ts`** | Captures animated vector frames and stitches them into a horizontal/vertical sprite sheet image with JSON coordinate metadata. |
-| **`src/utils/animations/index.ts`** | Complete 25-technique kinetic motion engine. Procedurally injects `<defs>`, dynamic masks, filters, keyframes, and timing properties into SVG nodes. |
+| **`src/utils/animations/index.ts`** | Kinetic motion engine — 24 core presets across six families plus 9 modern production adapters (scroll timelines, spring physics, GSAP, view transitions, Lottie export). Procedurally injects `<defs>`, dynamic masks, filters, keyframes, and timing properties into SVG nodes. |
 | **`src/utils/animations/helpers/clipPathBuilder.ts`** | Builds procedural SVG `<clipPath>`, `<mask />`, linear wipe gradients, iris circles, diagonal gates, and matrix glitch filters. |
 | **`src/utils/animations/helpers/keyframeGenerator.ts`** | Generates CSS `@keyframes` and class selectors for pen writing, typewriter, liquid morph, particle fountains, neon sweeps, and 3D kinetic turns. |
-| **`src/utils/vectorization/index.ts`** | Unified raster-to-SVG vectorization facade and engine catalog. Translates pixel buffers into structured multi-layer vector artworks. |
-| **`src/utils/vectorization/potraceTracer.ts`** | Medial axis skeletonization and Marching Squares boundary tracer with Douglas-Peucker bezier fitting. |
-| **`src/utils/vectorization/colorQuantizer.ts`** | K-means color clustering and stratified luminosity grouping for layered posterization vector art. |
-| **`src/utils/vectorization/delaunayMeshTracer.ts`** | Bowyer-Watson Delaunay triangulation engine for low-poly gradient vector geometry. |
-| **`src/utils/vectorization/halftoneDotTracer.ts`** | Pop-art variable radius circle grid modulated by pixel darkness. |
-| **`src/utils/vectorization/voronoiStippler.ts`** | Centroidal Voronoi / Lloyd relaxation ink stipple dot generator. |
-| **`src/utils/vectorization/contourIsolineTracer.ts`** | Marching Squares topographic elevation isoline generator. |
-| **`src/utils/vectorization/crossHatchTracer.ts`** | Multi-angle intaglio engraving and cross-hatch line vector engine. |
-| **`src/utils/vectorization/tspArtTracer.ts`** | Traveling Salesperson single-unbroken-stroke continuous line art tracer. |
-| **`src/utils/vectorization/cannyLineTracer.ts`** | Canny gradient edge detector and architectural blueprint tracer. |
-| **`src/utils/vectorization/voxel3dTracer.ts`** | 2.5D isometric shaded block and voxel vector projection. |
-| **`src/utils/vectorization/asciiMatrixTracer.ts`** | Monospace ASCII matrix vector typography generator. |
-| **`src/utils/vectorization/types.ts`** | Type definitions for vectorization options, trace algorithms, and layer metadata. |
+| **`src/utils/vectorization/index.ts`** | Unified raster-to-SVG vectorization orchestrator and technique registry (14 tracing engines + 3 experimental primitives). Translates pixel buffers into structured multi-layer vector artworks. |
+| **`src/utils/vectorization/engine.ts`** | Stable async `VectorizationEngine` facade for the UI, workers and future GPU/neural adapters, with progress reporting and path/color metadata. |
+| **`src/utils/vectorization/centerlineTracer.ts`** | Otsu binarization, Zhang-Suen morphological thinning, RDP simplification and cubic Bézier fitting for medial-axis line art. |
+| **`src/utils/vectorization/regionTracer.ts`** | Moore-Neighbor region boundary tracer with hole detection (Potrace-style solid fills). |
+| **`src/utils/vectorization/potraceTracer.ts`** | Boundary polygon contour engine. |
+| **`src/utils/vectorization/colorQuantizer.ts`** | K-means color clustering for layered posterization vector art. |
+| **`src/utils/vectorization/delaunayTriangulator.ts`** | Bowyer-Watson Delaunay triangulation low-poly mesh. |
+| **`src/utils/vectorization/halftoneDither.ts`** | Pop-art variable radius halftone dot matrix. |
+| **`src/utils/vectorization/voronoiStippler.ts`** | Centroidal Voronoi / Lloyd relaxation ink stipple generator. |
+| **`src/utils/vectorization/contourExtractor.ts`** | Marching Squares topographic elevation isoline generator. |
+| **`src/utils/vectorization/marchingSquares.ts`** | Multi-level scalar-field isoline tracer. |
+| **`src/utils/vectorization/crossHatchTracer.ts`** | Multi-angle intaglio engraving and cross-hatch engine. |
+| **`src/utils/vectorization/tspArtTracer.ts`** | Traveling Salesperson single-unbroken-stroke tracer. |
+| **`src/utils/vectorization/cannyLineTracer.ts`** | Canny gradient edge detector and blueprint tracer. |
+| **`src/utils/vectorization/sobelGradientTracer.ts`** | Directional gradient micro-stroke tracer. |
+| **`src/utils/vectorization/isometricVoxelTracer.ts`** | 2.5D isometric shaded voxel projection. |
+| **`src/utils/vectorization/asciiArtTracer.ts`** | Monospace ASCII matrix vector typography. |
+| **`src/utils/vectorization/slicSuperpixels.ts`** | Lab-space superpixel clustering (experimental primitive). |
+| **`src/utils/vectorization/featureDetectors.ts`** | Harris corner field detection (experimental primitive). |
+| **`src/utils/vectorization/fourierApproximator.ts`** | Fourier epicycle contour reconstruction (experimental primitive). |
+| **`src/utils/vectorization/optimization/`** | diffvg-style primitive optimizer and evolutionary base. |
+| **`src/utils/vectorization/neural/`** | Neural vectorizer provider base. |
+| **`src/utils/vectorization/helpers/`** | Shared raster/vector primitives — image processing, curve fitting, topology, SVG building. |
+
+### 2.7 README Asset Pipeline (`/scripts` + `/assets/readme`)
+
+| File / Path | Functionality |
+| :--- | :--- |
+| **`scripts/generate-readme-assets.mjs`** | Entry point that renders every README diagram from builder modules into `assets/readme/`. Deterministic: same input, same bytes. Fails if an asset exists that no builder produces. |
+| **`scripts/readme-assets/kit.mjs`** | Design system for diagrams — product color tokens, monospace layout primitives, arrow banks, HUD composites and generation-time assertions (text-width fitting, canvas bounds) so a broken asset cannot be emitted. |
+| **`scripts/readme-assets/assets-core.mjs`** | Builders: animated hero, status bar, typed scene graph, document engine, command history / undo-redo visualization. |
+| **`scripts/readme-assets/assets-flow.mjs`** | Builders: 14-engine vectorization matrix, raster pipeline, AI pipeline, security gate, export rail, 147-test verification console, deployment architecture, footer. |
+| **`scripts/verify-readme-assets.mjs`** | Verification gate: README image paths resolve locally, no external image references, no orphaned assets, XML well-formedness, intrinsic size + viewBox presence, GitHub Camo-safety (no scripts, event handlers, external URLs, font imports) and internal anchor integrity. Wired as `npm run assets:verify`. |
+| **`assets/readme/*.svg`** | The 13 generated diagrams referenced by `README.md`. Never hand-edit — regenerate with `npm run assets:generate`. |
 
 ---
-
 ## 3. Maintenance & Continuous Upgrade Policy
 
 To guarantee that this document remains a single source of truth across development cycles:
