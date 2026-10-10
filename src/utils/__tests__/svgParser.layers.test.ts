@@ -8,6 +8,8 @@ import {
   reorderSvgLayer,
   addNewSvgLayer,
   remapSvgColors,
+  normalizeHex,
+  analyzePaletteColorUsage,
 } from "../svgParser";
 
 /**
@@ -129,3 +131,41 @@ describe("remapSvgColors (local palette application)", () => {
     expect(out).toContain("#00ff00");
   });
 });
+
+describe("normalizeHex and analyzePaletteColorUsage regression tests", () => {
+  it("normalizes hex strings correctly", () => {
+    expect(normalizeHex("#00ff00")).toBe("#00FF00");
+    expect(normalizeHex("#0f0")).toBe("#00FF00");
+    expect(normalizeHex("00f0ff")).toBe("#00F0FF");
+  });
+
+  it("handles PaletteColor objects with .hex property", () => {
+    expect(normalizeHex({ name: "Cyber Neon", hex: "#00f0ff", role: "primary" })).toBe("#00F0FF");
+  });
+
+  it("handles undefined, null, or empty values gracefully without throwing", () => {
+    expect(normalizeHex(null)).toBe("");
+    expect(normalizeHex(undefined)).toBe("");
+    expect(normalizeHex("")).toBe("");
+  });
+
+  it("analyzes palette color usage with polymorphic color items", () => {
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+      <rect fill="#00FF00" width="10" height="10" />
+      <path stroke="#00F0FF" d="M0 0" />
+    </svg>`;
+    const analysis = analyzePaletteColorUsage(svg, [
+      "#00FF00",
+      { name: "Cyan", hex: "#00F0FF", role: "accent" },
+      { name: "Unused Red", hex: "#FF0000", role: "secondary" },
+    ]);
+
+    expect(analysis.totalPaletteColors).toBe(3);
+    expect(analysis.usedCount).toBe(2);
+    expect(analysis.unusedCount).toBe(1);
+    expect(analysis.usedColors.map((c) => c.hex)).toContain("#00FF00");
+    expect(analysis.usedColors.map((c) => c.hex)).toContain("#00F0FF");
+    expect(analysis.unusedColors.map((c) => c.hex)).toContain("#FF0000");
+  });
+});
+

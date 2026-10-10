@@ -1,0 +1,39 @@
+{
+  "audit_version": "2.1",
+  "head_sha": "6ccfb175f7ede4dbd8f1ac1c2f83eedcf33f30be",
+  "findings": [
+    {
+      "id": "F-PERF-001",
+      "lane": "PERF",
+      "severity": "P3",
+      "title": "Monolithic production client bundle exceeds 500 kB chunk threshold",
+      "status": "OPEN",
+      "evidence": "[E:cmd#npm run build]",
+      "description": "Vite production build outputs dist/assets/index-DtB72mRC.js at 1,383 kB (347 kB gzip), triggering build chunk size warning. Large sub-studios (AnimationStudio, ImportModal, EncyclopediaView) are bundled in the initial entry chunk rather than code-split.",
+      "impact": "Low. Slightly increased initial page download duration on slow mobile networks; does not impair application execution or correctness.",
+      "remediation": "Configure dynamic import() or rollupOptions.output.manualChunks to split vendor and sub-studio components."
+    },
+    {
+      "id": "F-SEC-001",
+      "lane": "SEC",
+      "severity": "P3",
+      "title": "External GitHub OAuth requires optional environment credentials",
+      "status": "OPEN",
+      "evidence": "[E:server/config.ts:L35-L42]",
+      "description": "The GitHub repository sync endpoint relies on GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET. When omitted, server returns HTTP 503 Service Unavailable gracefully with descriptive JSON.",
+      "impact": "Low. Core vector generation, editing, raster tracing, and code export work completely offline without external credentials.",
+      "remediation": "Documented in .env.example. Provide credentials if remote GitHub commit synchronization is required."
+    },
+    {
+      "id": "F-REL-001",
+      "lane": "REL",
+      "severity": "P3",
+      "title": "Sliding-window IP rate limiter is process-memory resident",
+      "status": "OPEN",
+      "evidence": "[E:server/security/rateLimit.ts:L22-L45]",
+      "description": "Rate limiting uses an in-memory Map structure. Process restarts reset accumulated window counts.",
+      "impact": "Low. Fully sufficient for single-container Node.js deployment on Cloud Run. Multi-instance scaling would require Redis backend.",
+      "remediation": "If clustering across multiple container instances, wire an external Redis client to the RateLimiter interface."
+    }
+  ]
+}

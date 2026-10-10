@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { PaletteTheme } from '../types';
+import { PaletteColor, PaletteTheme } from '../types';
 import { PALETTE_THEMES } from '../data/palettes';
 import { VECTORA_BASE_PALETTE, VECTORA_SVG_STYLE_BLOCK } from '../data/vectoraBasePalette';
 import { analyzePaletteColorUsage } from '../utils/svgParser';
@@ -26,7 +26,7 @@ import {
 
 interface PaletteManagerProps {
   onApplyPalette: (theme: PaletteTheme) => void;
-  currentColors?: string[];
+  currentColors?: (string | PaletteColor)[];
   activeSvg?: string;
 }
 
@@ -80,33 +80,47 @@ export const PaletteManager: React.FC<PaletteManagerProps> = ({
   const [appliedPaletteId, setAppliedPaletteId] = useState<string | null>(null);
   const [copiedCodeType, setCopiedCodeType] = useState<string | null>(null);
 
+  // Safely extract string hex codes from polymorphic currentColors array
+  const normalizedCurrentColors = useMemo(() => {
+    if (!currentColors || !Array.isArray(currentColors)) return [];
+    return currentColors
+      .map((c) => {
+        if (typeof c === 'string') return c;
+        if (c && typeof c === 'object' && 'hex' in c && typeof (c as any).hex === 'string') {
+          return (c as any).hex;
+        }
+        return '';
+      })
+      .filter(Boolean);
+  }, [currentColors]);
+
   // Active palette being analyzed (either the one being edited, applied, or the current artwork colors)
   const activePaletteForAnalysis = useMemo(() => {
     if (appliedPaletteId) {
       const found = [...customPalettes, ...PALETTE_THEMES].find((p) => p.id === appliedPaletteId);
       if (found) return found.colors;
     }
-    if (currentColors && currentColors.length > 0) {
-      return currentColors;
+    if (normalizedCurrentColors && normalizedCurrentColors.length > 0) {
+      return normalizedCurrentColors;
     }
     return paletteColors;
-  }, [appliedPaletteId, customPalettes, currentColors, paletteColors]);
+  }, [appliedPaletteId, customPalettes, normalizedCurrentColors, paletteColors]);
 
   // Compute live SVG color utilization diagnostics
   const usageAnalysis = useMemo(() => {
     if (!activeSvg) {
       return {
-        usedColors: currentColors.map((hex) => ({ hex, isUsed: true, count: 1, elements: [{ tag: 'path', attr: 'fill', count: 1 }] })),
+        usedColors: normalizedCurrentColors.map((hex) => ({ hex, isUsed: true, count: 1, elements: [{ tag: 'path', attr: 'fill', count: 1 }] })),
         unusedColors: [],
-        totalPaletteColors: currentColors.length,
-        usedCount: currentColors.length,
+        totalPaletteColors: normalizedCurrentColors.length,
+        usedCount: normalizedCurrentColors.length,
         unusedCount: 0,
         coveragePct: 100,
-        allSvgColorsFound: currentColors,
+        allSvgColorsFound: normalizedCurrentColors,
       };
     }
     return analyzePaletteColorUsage(activeSvg, activePaletteForAnalysis);
-  }, [activeSvg, activePaletteForAnalysis, currentColors]);
+  }, [activeSvg, activePaletteForAnalysis, normalizedCurrentColors]);
 
   // Save to localStorage on change
   useEffect(() => {

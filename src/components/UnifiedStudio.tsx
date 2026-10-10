@@ -4,7 +4,7 @@ import {
   Layers, Palette, Zap, Puzzle, FileCode, Search, 
   MessageSquare, ChevronLeft, ChevronRight, Download, 
   Share2, Save, Play, Pause, RotateCcw, Sliders, Info, X, Send, Github,
-  Image as ImageIcon, Check, Sparkles, ExternalLink
+  Image as ImageIcon, Check, Sparkles, ExternalLink, Loader2, RefreshCw
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { StudioCanvas } from './StudioCanvas';
@@ -17,7 +17,9 @@ import { PluginGallery } from './PluginGallery';
 import { ExportModal } from './ExportModal';
 import { ImportModal } from './ImportModal';
 import { RefinePromptBar } from './RefinePromptBar';
-import { CanvasSettings, LayerSpec, VectorArtwork } from '../types';
+import { ParametricPanel } from './ParametricPanel';
+import { ReusableComponentShowcase } from './ReusableComponentShowcase';
+import { CanvasSettings, LayerSpec, VectorArtwork, PaletteTheme } from '../types';
 import { exportSvgToPng, downloadBlob } from '../utils/svgParser';
 import {
   importSvg,
@@ -44,6 +46,7 @@ import {
 
 interface UnifiedStudioProps {
   artwork: VectorArtwork;
+  currentPrompt?: string;
   onUpdateSvg: (svg: string) => void;
   onUpdateArtwork: (artwork: VectorArtwork) => void;
   onBack: () => void;
@@ -51,11 +54,12 @@ interface UnifiedStudioProps {
 
 export const UnifiedStudio: React.FC<UnifiedStudioProps> = ({ 
   artwork, 
+  currentPrompt,
   onUpdateSvg, 
   onUpdateArtwork,
   onBack 
 }) => {
-  const [activeTool, setActiveTool] = useState<'layers' | 'colors' | 'animation' | 'plugins' | 'specs' | 'code' | null>(null);
+  const [activeTool, setActiveTool] = useState<'layers' | 'colors' | 'parametric' | 'animation' | 'components' | 'plugins' | 'specs' | 'code' | null>(null);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
@@ -63,6 +67,7 @@ export const UnifiedStudio: React.FC<UnifiedStudioProps> = ({
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [chatMessage, setChatMessage] = useState('');
   const [isRefining, setIsRefining] = useState(false);
+  const [isGeneratingVariation, setIsGeneratingVariation] = useState(false);
   // GitHub connection state. The OAuth token lives in a server-side session
   // (HTTP-only cookie) — the browser never stores or handles the raw token.
   const [githubConnected, setGithubConnected] = useState(false);
@@ -304,6 +309,28 @@ export const UnifiedStudio: React.FC<UnifiedStudioProps> = ({
     });
   };
 
+  const handleApplyPaletteTheme = (theme: PaletteTheme) => {
+    handleApplyPalette(theme.colors);
+  };
+
+  const handleInjectReusableComponent = (defsSnippet: string, useSnippet: string) => {
+    let current = exportedSvg;
+    if (defsSnippet && !current.includes(defsSnippet.slice(0, 30))) {
+      if (current.includes('<defs>')) {
+        current = current.replace('<defs>', `<defs>\n${defsSnippet}\n`);
+      } else if (current.includes('</svg>')) {
+        current = current.replace('</svg>', `<defs>\n${defsSnippet}\n</defs>\n</svg>`);
+      }
+    }
+    if (useSnippet) {
+      current = current.replace('</svg>', `  ${useSnippet}\n</svg>`);
+    }
+    handleExternalSvgChange(current, 'Inject Reusable Component', 'inject-component');
+    toast.success('Component Injected', {
+      description: 'Added modular vector HUD component to active canvas (undoable)',
+    });
+  };
+
   /**
    * Apply an externally-produced SVG string (code editor, animation studio)
    * to the document as a single undoable command. Cosmetic-only changes
@@ -459,6 +486,99 @@ export const UnifiedStudio: React.FC<UnifiedStudioProps> = ({
     }
   };
 
+  /**
+   * Generates a new variation/iteration of the current artwork by calling the backend
+   * with the current prompt and the is_variation flag set to true.
+   */
+  const handleGenerateVariation = async () => {
+    if (isGeneratingVariation) return;
+    const promptToUse =
+      (currentPrompt && currentPrompt.trim()) ||
+      artwork.concept ||
+      artwork.title ||
+      'Masterpiece vector artwork';
+
+    setIsGeneratingVariation(true);
+    const toastId = toast.loading('Synthesizing Creative Variation...', {
+      description: `Iterating on "${artwork.title}" with is_variation flag...`,
+    });
+
+    try {
+      let response: Response;
+      try {
+        response = await fetch('/api/generate-svg', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            prompt: promptToUse,
+            style: artwork.style || 'Art Deco',
+            complexity: 'balanced',
+            paletteMood: 'default',
+            is_variation: true,
+          }),
+        });
+      } catch (networkErr: any) {
+        response = await fetch('/api/generate-unified', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            prompt: promptToUse,
+            type: 'text',
+            is_variation: true,
+          }),
+        });
+      }
+
+      if (response.status === 429 || response.status === 503) {
+        toast.error('Engine Cooling Down', {
+          id: toastId,
+          description: 'Free tier quota reached or model busy. Please wait a moment...',
+        });
+      }
+
+      if (!response.ok) {
+        let errorDetail = 'Variation generation failed';
+        try {
+          const errJson = await response.json();
+          if (errJson?.error) errorDetail = errJson.error;
+        } catch (_) {
+          errorDetail = `Server returned status ${response.status}`;
+        }
+        throw new Error(errorDetail);
+      }
+
+      const result = await response.json();
+      if (result.success && result.data) {
+        const variationArtwork: VectorArtwork = {
+          ...result.data,
+          id: `var_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+          title: result.data.title || `${artwork.title} (Variation)`,
+          createdAt: new Date().toISOString(),
+        };
+
+        // Update the full artwork and synchronize studio state
+        onUpdateArtwork(variationArtwork);
+        if (variationArtwork.svg) {
+          onUpdateSvg(variationArtwork.svg);
+        }
+        toast.success('Vector Variation Generated', {
+          id: toastId,
+          description: `Created new iteration: "${variationArtwork.title}"`,
+        });
+      } else {
+        throw new Error(result.error || 'Invalid variation response received.');
+      }
+    } catch (err: any) {
+      console.error('Variation error:', err);
+      toast.error('Variation Generation Failed', {
+        id: toastId,
+        description: err.message || 'The AI engine encountered an issue creating the variation.',
+      });
+    } finally {
+      setIsGeneratingVariation(false);
+    }
+  };
+
   // On mount, check whether a server-side GitHub session is still alive.
   useEffect(() => {
     let cancelled = false;
@@ -532,7 +652,9 @@ export const UnifiedStudio: React.FC<UnifiedStudioProps> = ({
   const tools = [
     { id: 'layers', icon: Layers, label: 'Layers' },
     { id: 'colors', icon: Palette, label: 'Colors' },
+    { id: 'parametric', icon: Sliders, label: 'Parametric FX' },
     { id: 'animation', icon: Zap, label: 'Animation' },
+    { id: 'components', icon: Sparkles, label: 'Components' },
     { id: 'plugins', icon: Puzzle, label: 'Plugins' },
     { id: 'specs', icon: Info, label: 'Specs' },
     { id: 'code', icon: FileCode, label: 'Code' },
@@ -733,9 +855,17 @@ export const UnifiedStudio: React.FC<UnifiedStudioProps> = ({
               )}
               {activeTool === 'colors' && (
                 <PaletteManager 
-                  onApplyPalette={handleApplyPalette} 
+                  onApplyPalette={handleApplyPaletteTheme} 
                   currentColors={artwork.palette || []} 
                   activeSvg={exportedSvg} 
+                />
+              )}
+              {activeTool === 'parametric' && (
+                <ParametricPanel 
+                  settings={canvasSettings}
+                  onUpdateSettings={handleUpdateSettings}
+                  onApplyPaletteTheme={handleApplyPaletteTheme}
+                  onClose={() => setActiveTool(null)}
                 />
               )}
               {activeTool === 'animation' && (
@@ -745,7 +875,19 @@ export const UnifiedStudio: React.FC<UnifiedStudioProps> = ({
                   onSwitchToCanvas={() => setActiveTool(null)}
                 />
               )}
-              {activeTool === 'plugins' && <PluginGallery />}
+              {activeTool === 'components' && (
+                <ReusableComponentShowcase 
+                  onInjectComponent={handleInjectReusableComponent}
+                />
+              )}
+              {activeTool === 'plugins' && (
+                <PluginGallery 
+                  activeSvg={exportedSvg}
+                  onApplyPlugin={(modSvg, pluginName) => 
+                    handleExternalSvgChange(modSvg, `Plugin: ${pluginName}`, 'plugin')
+                  }
+                />
+              )}
               {activeTool === 'specs' && <DesignSpecPanel artwork={artwork} />}
               {activeTool === 'code' && (
                 <CodeEditor
@@ -760,8 +902,30 @@ export const UnifiedStudio: React.FC<UnifiedStudioProps> = ({
 
       {/* Canvas Viewport */}
       <div className="relative flex-1 overflow-hidden">
-        {/* Quick Direct Export HUD */}
+        {/* Quick Direct Export & Action HUD */}
         <div className="absolute top-3 right-3 sm:top-4 sm:right-4 z-30 flex items-center gap-1.5 font-mono">
+          {/* Generate Variation Button */}
+          <button
+            id="btn-generate-variation"
+            onClick={handleGenerateVariation}
+            disabled={isGeneratingVariation}
+            title={`Generate Variation of "${artwork.title}" with current prompt (is_variation=true)`}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-[#FFEA00] hover:bg-[#FFEE33] text-[#000000] border border-[#FFEA00] text-xs font-bold uppercase tracking-wider rounded-lg shadow-lg hover:shadow-[0_0_15px_rgba(255,234,0,0.4)] transition-all disabled:opacity-50 disabled:cursor-not-allowed group"
+          >
+            {isGeneratingVariation ? (
+              <>
+                <Loader2 size={13} className="animate-spin text-black" />
+                <span>Generating...</span>
+              </>
+            ) : (
+              <>
+                <Sparkles size={13} className="text-black group-hover:rotate-12 transition-transform" />
+                <span className="hidden sm:inline">Generate Variation</span>
+                <span className="sm:hidden">Variation</span>
+              </>
+            )}
+          </button>
+
           <button
             onClick={handleDownloadSvg}
             title="Download Vector .SVG (Ctrl+Shift+S)"
@@ -809,8 +973,13 @@ export const UnifiedStudio: React.FC<UnifiedStudioProps> = ({
           canRedo={historyFlags.canRedo}
         />
 
-        {/* Real-Time On-Canvas Prompt Refinement */}
-        <RefinePromptBar onRefine={handleRefine} isRefining={isRefining} />
+        {/* Real-Time On-Canvas Prompt Refinement & Variation Trigger */}
+        <RefinePromptBar
+          onRefine={handleRefine}
+          isRefining={isRefining}
+          onGenerateVariation={handleGenerateVariation}
+          isGeneratingVariation={isGeneratingVariation}
+        />
       </div>
 
       {/* Modals */}

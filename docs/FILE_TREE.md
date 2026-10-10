@@ -17,7 +17,18 @@
 ├── .gitignore                       # Git ignore declarations for build outputs & secrets
 ├── AGENTS.md                        # Persistent agent instructions and maintenance rules
 ├── VERIFICATION_REPORT.md           # System verification, stress-test audit & diagnostic logs
-├── bun.lock                         # Bun runtime lockfile
+├── audit/                           # ARBITER-MVP v2.1 autonomous audit and release adjudication suite
+│   ├── 00_inventory.json            # Physics, manifest enumeration & MVP definition
+│   ├── 01_findings.json             # Universal finding register (EXEC, SEC, DATA, RELY, QUAL, OPS)
+│   ├── 02_scorecard.json            # Deterministic quantitative score engine & dimension weights
+│   ├── 03_decision.json             # GO / NO-GO adjudication decision block
+│   ├── 04_validation.json           # Independent cross-validation certificate & freeze hashes
+│   ├── 05_blueprint.json            # Execution blueprint tasks DAG (M0–M4)
+│   ├── 05_blueprint.md              # Detailed human-readable execution plan
+│   ├── 06_execution_log.md          # Execution activity, commands, diffs & verifications
+│   ├── 07_final_report.md           # Comprehensive release audit report & launch runbook
+│   ├── mc_sim.py                    # Deterministic Monte Carlo simulation engine (seed 424242)
+│   └── mc_out.txt                   # Monte Carlo output and confidence intervals
 ├── index.html                       # HTML application entry point & Google Fonts loading
 ├── metadata.json                    # Application metadata, permissions & capabilities
 ├── package.json                     # Project manifest (vectora), npm dependencies & build scripts
@@ -77,6 +88,7 @@
     │   ├── AnimatedIntro.tsx        # Kinetic cybernetic splash sequence
     │   ├── AnimationStudio.tsx      # Standalone kinetic vector animation workspace
     │   ├── AnimationSyncManager.tsx # SMIL, CSS keyframe and timeline synchronization engine
+    │   ├── BatchExportModal.tsx     # Batch export ZIP archive preview grid and generator modal
     │   ├── CodeEditor.tsx           # Monospace SVG code editor with live two-way binding
     │   ├── CommandPalette.tsx       # Global Cmd/Ctrl+K spotlight command palette & generation triggers
     │   ├── DesignSpecPanel.tsx      # SVG geometry, DOM node metric & AST telemetry inspector
@@ -100,6 +112,11 @@
     │   ├── SafeSvg.tsx              # Sanitized SVG renderer — the only sanctioned inline-SVG path
     │   ├── StudioCanvas.tsx         # Pan/zoom vector artboard with Cartesian/Polar grids
     │   └── UnifiedStudio.tsx        # Integrated master workstation (canonical document + command history)
+    │
+    ├── hooks/                       # Custom React state & lifecycle hooks
+    │   ├── useArtworkSession.ts     # Automatic localStorage persistence & restoration hook ('last_active_session')
+    │   ├── useZoomPan.ts            # Viewport scroll-to-zoom and drag-to-pan utility hook for vector canvases
+    │   └── __tests__/               # Unit & integration tests for hooks (session persistence, zoom & pan)
     │
     ├── document/                     # Canonical document engine (Phase 1) — the editing source of truth
     │   ├── types.ts                  # VectorDocument, PageNode, Element/Text/Comment nodes, schema version
@@ -190,6 +207,22 @@
 
 ---
 
+### 2.2a Audit & Adjudication Suite (`/audit`)
+
+| File / Path | Purpose & Content |
+| :--- | :--- |
+| **`audit/00_inventory.json`** | Physical inventory, LOC metrics, manifests, supply chain audit, and MVP scope definition. |
+| **`audit/01_findings.json`** | Universal finding register categorized across all 8 audit lanes and 12 quantitative dimensions. |
+| **`audit/02_scorecard.json`** | Deterministic quantitative score matrix with dimension penalties, caps, and Monte Carlo output. |
+| **`audit/03_decision.json`** | Launch adjudication decision block, hard gates, unmet conditions, and release verdict. |
+| **`audit/04_validation.json`** | Independent cross-LLM validation report, freeze hashes, and signed verification certificate. |
+| **`audit/05_blueprint.json`** / **`.md`** | Remediation blueprint and milestone DAG (M0 Unblock, M1 De-risk, M2 Harden, M3 Launch). |
+| **`audit/06_execution_log.md`** | Chronological record of fix executions, diffs, test executions, and verification commands. |
+| **`audit/07_final_report.md`** | Comprehensive executive audit report, score evolution, residual risks, and release runbook. |
+| **`audit/mc_sim.py`** / **`mc_out.txt`** | Deterministic Monte Carlo simulation engine (seed 424242) and distribution logs. |
+
+---
+
 ### 2.3 Application Core & Entry (`/src`)
 
 | File / Path | Purpose & Functionality |
@@ -231,6 +264,17 @@
 | **`PluginGallery.tsx`** | Marketplace of modular vector filters, parametric algorithms, and design extensions. |
 | **`ReusableComponentShowcase.tsx`**| Visual gallery of reusable vector elements (telemetry gauges, circular HUD meters, tech borders, status pills). |
 | **`MainLayout.tsx`** | Responsive structural wrapper orchestrating drawer positioning, sidebar collapse states, and viewport containment. |
+
+---
+
+### 2.4a State Persistence & Lifecycle Hooks (`/src/hooks`)
+
+| File / Path | Responsibility & Behavior |
+| :--- | :--- |
+| **`src/hooks/useArtworkSession.ts`** | Automatic synchronization and session persistence hook. Automatically writes `currentArtwork` to `localStorage` under the `last_active_session` key on every state change and transparently rehydrates it on application boot. |
+| **`src/hooks/useZoomPan.ts`** | High-performance canvas zoom and pan utility hook. Manages focal-point scroll-to-zoom, mouse drag-to-pan, touch gestures, view reset, and view fit transformations for SVG canvas viewports. |
+| **`src/hooks/__tests__/useArtworkSession.test.ts`** | Comprehensive unit and integration test suite validating boot restoration, localStorage updates, corrupted JSON handling, and state mutation triggers. |
+| **`src/hooks/__tests__/useZoomPan.test.tsx`** | Test suite exercising zoom clamp boundaries, focal wheel zooming, mouse pan delta tracking, and custom viewport reset handlers. |
 
 ---
 

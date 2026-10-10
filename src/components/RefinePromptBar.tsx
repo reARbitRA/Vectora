@@ -4,11 +4,15 @@ import { Sparkles, Send, Loader2, ChevronDown, ChevronUp } from 'lucide-react';
 interface RefinePromptBarProps {
   onRefine: (instruction: string) => Promise<void>;
   isRefining: boolean;
+  onGenerateVariation?: () => Promise<void>;
+  isGeneratingVariation?: boolean;
 }
 
 export const RefinePromptBar: React.FC<RefinePromptBarProps> = ({
   onRefine,
   isRefining,
+  onGenerateVariation,
+  isGeneratingVariation = false,
 }) => {
   const [prompt, setPrompt] = useState('');
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -105,6 +109,23 @@ export const RefinePromptBar: React.FC<RefinePromptBarProps> = ({
                 </>
               )}
             </button>
+
+            {onGenerateVariation && (
+              <button
+                type="button"
+                onClick={onGenerateVariation}
+                disabled={isGeneratingVariation || isRefining}
+                title="Generate Variation of current artwork (is_variation: true)"
+                className="flex items-center gap-1 bg-[#FFEA00] hover:bg-[#FFEE33] text-[#000000] font-bold px-2.5 py-1.5 text-xs transition-all uppercase tracking-wider disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
+              >
+                {isGeneratingVariation ? (
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                ) : (
+                  <Sparkles className="w-3 h-3 text-[#000000]" />
+                )}
+                <span className="hidden md:inline">{isGeneratingVariation ? 'Generating...' : 'Variation'}</span>
+              </button>
+            )}
           </form>
         </div>
       )}

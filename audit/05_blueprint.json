@@ -1,0 +1,27 @@
+{
+  "audit_version": "2.1",
+  "project": "VECTORA SVG Studio",
+  "version": "2.6.0",
+  "architecture": {
+    "frontend": {
+      "framework": "React 19 SPA (Vite 6, TypeScript 5.8)",
+      "styling": "Tailwind CSS 4",
+      "state": "Canonical AST Document tree (src/document/*) with reversible command history & persistence",
+      "vectorization": "17 pure TypeScript/JS algorithms (contour, centerline, delaunay, potrace, voronoi, etc.)",
+      "animation": "Parametric SMIL/CSS keyframe engine + client GIF/spritesheet renderers",
+      "export": "SVG, High-DPI PNG, React TSX, CSS Data URI, GitHub commit"
+    },
+    "backend": {
+      "runtime": "Node.js 22 + Express",
+      "ai_orchestrator": "Cascading Gemini pool (gemini-3.8-flash, gemini-3.1-flash-lite, gemini-2.5-flash, gemini-flash-latest)",
+      "security": "Double-layer SVG sanitization, sliding-window rate limiting, HTTP-only session cookies, single-use OAuth CSRF states",
+      "validation": "Runtime schema contracts (server/ai/contracts.ts) and node budget enforcement"
+    }
+  },
+  "verification_suite": {
+    "test_runner": "Vitest 5",
+    "test_suites": 15,
+    "tests_total": 147,
+    "status": "GREEN"
+  }
+}

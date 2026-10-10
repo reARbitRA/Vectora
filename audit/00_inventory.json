@@ -1,0 +1,110 @@
+{
+  "audit_version": "2.1",
+  "head_sha": "6ccfb175f7ede4dbd8f1ac1c2f83eedcf33f30be",
+  "short_sha": "6ccfb17",
+  "branch": "audit/mvp-readiness-6ccfb17",
+  "timestamp": "2026-10-09T19:18:30Z",
+  "physics": {
+    "total_files": 150,
+    "total_loc": 28959,
+    "file_breakdown": {
+      "ts": 87,
+      "tsx": 30,
+      "svg": 13,
+      "md": 8,
+      "mjs": 5,
+      "json": 3,
+      "html": 1,
+      "gitignore": 1,
+      "example": 1,
+      "css": 1
+    },
+    "commits": 1,
+    "branches": ["audit/mvp-readiness-6ccfb17", "master"]
+  },
+  "manifests": {
+    "package_json": "package.json",
+    "package_lock_json": "package-lock.json",
+    "tsconfig": "tsconfig.json",
+    "vite_config": "vite.config.ts",
+    "vitest_config": "vitest.config.ts"
+  },
+  "supply_chain": {
+    "tool": "npm audit",
+    "exit_code": 0,
+    "vulnerabilities": {
+      "info": 0,
+      "low": 0,
+      "moderate": 0,
+      "high": 0,
+      "critical": 0,
+      "total": 0
+    },
+    "dependencies_total": 290,
+    "prod_dependencies": 197,
+    "dev_dependencies": 85
+  },
+  "mvp_definition": {
+    "scope_inferred": false,
+    "source_of_truth": ["metadata.json", "docs/APP_REPORT.md", "docs/AUDIT.md", "README.md", "package.json", "server.ts"],
+    "primary_user_journeys": [
+      {
+        "id": "UJ-1",
+        "name": "Text-to-Vector Generative Synthesis",
+        "description": "User enters text prompt, style preset, complexity tier, and palette; backend model orchestrator queries Gemini model pool and returns layered semantic SVG DOM conforming to VECTORA contracts.",
+        "endpoints": ["/api/generate-svg", "/api/generate-unified"],
+        "ui_entry": "src/components/HomeView.tsx",
+        "status": "VERIFIED_WORKING"
+      },
+      {
+        "id": "UJ-2",
+        "name": "Multimodal Raster & Brief Vectorization",
+        "description": "User uploads an image, document, or pastes raw text/SVG; algorithmic tracer (17 client-side algorithms) or server vision model vectorizes the content into an editable multi-layer SVG document.",
+        "endpoints": ["/api/import-vectorize"],
+        "ui_entry": "src/components/ImportModal.tsx",
+        "status": "VERIFIED_WORKING"
+      },
+      {
+        "id": "UJ-3",
+        "name": "Interactive Artboard & Layer Tree Editing",
+        "description": "User navigates the SVG canvas (pan/zoom, coordinate crosshairs, grids), modifies AST layers (visibility, lock, solo, rename, reorder, blend modes), and alters document state via undoable commands.",
+        "endpoints": [],
+        "ui_entry": "src/components/UnifiedStudio.tsx",
+        "status": "VERIFIED_WORKING"
+      },
+      {
+        "id": "UJ-4",
+        "name": "Real-time Refinement & Parametric Motion Animation",
+        "description": "User refines artwork with natural language directives, adjusts parametric FX (stroke scale, grain, glow, palette remapping, plugins), or choreographs CSS/SMIL animations via the motion timeline.",
+        "endpoints": ["/api/refine-svg", "/api/animate-svg"],
+        "ui_entry": "src/components/AnimationStudio.tsx",
+        "status": "VERIFIED_WORKING"
+      },
+      {
+        "id": "UJ-5",
+        "name": "Multi-Format Production Export & GitHub Versioning",
+        "description": "User exports the canonical artwork to .SVG, high-resolution .PNG (1x-8x), React TSX components, CSS Data URI, animated GIFs/sprites, or commits directly to a remote GitHub repository via OAuth session.",
+        "endpoints": ["/api/auth/github/*", "/api/github/sync"],
+        "ui_entry": "src/components/ExportModal.tsx",
+        "status": "VERIFIED_WORKING"
+      }
+    ],
+    "in_scope": [
+      "AI vector generation and conversational refinement",
+      "Multimodal raster-to-SVG vectorization (17 client-side algorithms + AI vision)",
+      "Interactive vector canvas (Cartesian/Polar/Isometric drafting grids, pan/zoom)",
+      "AST-backed layer management (Inkscape layer groups, visibility, locks, renaming, blend modes)",
+      "Undo/redo command history and persistence (IndexedDB autosave + localStorage)",
+      "Parametric filter controls and functional plugin ecosystem",
+      "CSS/SMIL kinetic animation studio, timeline scrubber, and GIF/spritesheet export",
+      "Multi-format code/file export (.SVG, .PNG, React TSX, CSS Data URI)",
+      "Hardened server-side GitHub OAuth connection and design syncing"
+    ],
+    "out_of_scope": [
+      "Full 3D spatial mesh rendering (Three.js/WebGL scene pipelines)",
+      "Real-time multi-user collaborative WebSockets editing",
+      "Server-side relational SQL database (Cloud SQL / PostgreSQL) - uses client-side IndexedDB and server-side sessions",
+      "Payment gateway and commercial subscription billing"
+    ]
+  }
+}

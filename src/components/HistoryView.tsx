@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { downloadBlob, exportSvgToPng } from '../utils/svgParser';
 import { toast } from 'sonner';
+import { BatchExportModal } from './BatchExportModal';
 
 interface HistoryViewProps {
   onSelectArtwork: (artwork: VectorArtwork) => void;
@@ -31,6 +32,7 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
 }) => {
   const [historyItems, setHistoryItems] = useState<VectorArtwork[]>([]);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [isBatchExportOpen, setIsBatchExportOpen] = useState(false);
 
   // Load user designs from localStorage, fallback to curated seeds
   useEffect(() => {
@@ -130,6 +132,15 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
           </div>
 
           <div className="flex items-center gap-2">
+            {historyItems.length > 0 && (
+              <button
+                onClick={() => setIsBatchExportOpen(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-[#141414] border border-[#333333] hover:border-[#00FF00] text-[#00FF00] font-bold text-xs uppercase transition-colors rounded"
+              >
+                <Download size={14} />
+                <span>Batch Export (.ZIP)</span>
+              </button>
+            )}
             <button
               onClick={onNewDesign}
               className="flex items-center gap-2 px-4 py-2 bg-[#00FF00] text-black font-bold text-xs uppercase hover:bg-[#00DD00] transition-colors rounded"
@@ -258,6 +269,12 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
           </div>
         )}
       </div>
+
+      <BatchExportModal
+        isOpen={isBatchExportOpen}
+        onClose={() => setIsBatchExportOpen(false)}
+        artworks={historyItems}
+      />
     </div>
   );
 };

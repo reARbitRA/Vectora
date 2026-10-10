@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { 
   Menu, X, LayoutGrid, Plus, History, Settings, Github, 
   HelpCircle, ChevronLeft, ChevronRight, User, LogOut,
-  PenTool, Sparkles, Command, BookOpen
+  PenTool, Sparkles, Command, BookOpen, Zap
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -16,6 +16,7 @@ interface MainLayoutProps {
   artworkTitle?: string;
   onOpenShortcuts?: () => void;
   onOpenCommandPalette?: () => void;
+  onReplayIntro?: () => void;
 }
 
 export const MainLayout: React.FC<MainLayoutProps> = ({ 
@@ -26,7 +27,8 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
   setSidebarCollapsed,
   artworkTitle,
   onOpenShortcuts,
-  onOpenCommandPalette
+  onOpenCommandPalette,
+  onReplayIntro,
 }) => {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
 
@@ -75,13 +77,13 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              className="flex items-center gap-2 cursor-pointer"
+              className="flex items-center gap-2.5 cursor-pointer"
               onClick={() => onViewChange('studio')}
             >
-              <div className="w-6 h-6 rounded bg-[#00FF00] flex items-center justify-center font-bold text-black text-xs font-mono">
+              <div className="w-6 h-6 border-2 border-[#FFEA00] bg-[#FFEA00] flex items-center justify-center font-black text-black text-xs font-mono shadow-[0_0_10px_rgba(255,234,0,0.4)]">
                 V
               </div>
-              <span className="text-lg font-bold tracking-wider text-white font-mono uppercase">
+              <span className="text-xl font-extrabold tracking-tight text-white font-syne uppercase">
                 VECTORA
               </span>
             </motion.div>
@@ -152,6 +154,9 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
             <span className="text-[#00FF00] font-bold uppercase truncate max-w-xs md:max-w-md">
               {viewTitles[activeView] || 'Workspace'}
             </span>
+            <span className="hidden lg:inline text-[10px] text-white/30 tracking-widest pl-2 border-l border-white/10 uppercase">
+              SWISS_CHRONO_1968 // ID:882-990-X
+            </span>
           </div>
 
           <div className="flex items-center gap-3">
@@ -204,6 +209,17 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
                     >
                       <LayoutGrid size={14} /> Masterpiece Gallery
                     </button>
+                    {onReplayIntro && (
+                      <button 
+                        onClick={() => {
+                          setIsProfileOpen(false);
+                          onReplayIntro();
+                        }}
+                        className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-white/60 hover:bg-white/5 hover:text-[#00FF00]"
+                      >
+                        <Zap size={14} className="text-[#00FF00]" /> Replay Boot Intro
+                      </button>
+                    )}
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -214,6 +230,27 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
         <main className="flex-1 overflow-auto bg-[#0a0a0a] relative">
           {children}
         </main>
+
+        {/* Variation 4 Bottom Telemetry Status Strip */}
+        <footer className="h-7 border-t border-white/10 bg-[#000000] px-4 flex items-center justify-between text-[10px] font-mono select-none z-10">
+          <div className="flex items-center gap-4">
+            <span className="text-[#FF003C] font-bold flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#FF003C] animate-pulse"></span>
+              STATUS: STABLE
+            </span>
+            <span className="text-white/40 hidden sm:inline">
+              CORE: B-TYPE // SWISS_CHRONO_1968
+            </span>
+          </div>
+          <div className="flex items-center gap-3 text-white/50">
+            <span className="text-[#FFEA00] hidden md:inline">
+              WORKSPACE_LIVE
+            </span>
+            <span className="text-white/30">
+              [CMD] EVOLVE TRIGGER READY
+            </span>
+          </div>
+        </footer>
       </div>
     </div>
   );

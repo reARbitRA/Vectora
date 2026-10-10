@@ -6,9 +6,10 @@ interface HomeViewProps {
   onGenerate: (prompt: string, file?: File) => void;
   isGenerating: boolean;
   onGoToStudio?: () => void;
+  onOpenAiModal?: () => void;
 }
 
-export const HomeView: React.FC<HomeViewProps> = ({ onGenerate, isGenerating, onGoToStudio }) => {
+export const HomeView: React.FC<HomeViewProps> = ({ onGenerate, isGenerating, onGoToStudio, onOpenAiModal }) => {
   const [prompt, setPrompt] = useState('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -102,6 +103,17 @@ export const HomeView: React.FC<HomeViewProps> = ({ onGenerate, isGenerating, on
                 <Upload className="h-5 w-5 transition-transform group-hover:-translate-y-0.5" />
                 <span className="text-sm font-medium">Upload Reference</span>
               </button>
+              {onOpenAiModal && (
+                <button
+                  type="button"
+                  onClick={onOpenAiModal}
+                  className="group flex items-center gap-2 rounded-xl px-3.5 py-2 text-white/50 transition-all hover:bg-white/5 hover:text-[#00FF00]"
+                  title="Tune aesthetic style presets, complexity, and color palettes"
+                >
+                  <Sparkles className="h-4 w-4 text-[#00FF00] transition-transform group-hover:scale-110" />
+                  <span className="text-sm font-medium">Style Blueprints</span>
+                </button>
+              )}
               <input
                 type="file"
                 ref={fileInputRef}

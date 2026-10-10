@@ -1,0 +1,70 @@
+{
+  "audit_version": "2.1",
+  "head_sha": "6ccfb175f7ede4dbd8f1ac1c2f83eedcf33f30be",
+  "timestamp": "2026-10-09T19:24:45Z",
+  "freeze_status": "LOCKED",
+  "evidence_spotcheck": [
+    {
+      "token": "[E:cmd#npm test]",
+      "claim": "15 test suites and 147 unit/integration tests passing",
+      "result": "PASS",
+      "verified_value": "15 passed, 147 passed in 17.34s"
+    },
+    {
+      "token": "[E:cmd#npm audit]",
+      "claim": "Supply chain clean with 0 known vulnerabilities",
+      "result": "PASS",
+      "verified_value": "found 0 vulnerabilities"
+    },
+    {
+      "token": "[E:cmd#curl health]",
+      "claim": "Express health endpoint returns 200 OK with aiConfigured true",
+      "result": "PASS",
+      "verified_value": "status: ok, service: VECTORA SVG Studio Engine v2.0"
+    },
+    {
+      "token": "[E:cmd#curl diagnostics]",
+      "claim": "Model orchestrator health returns 4 tiers active with 100% success rate",
+      "result": "PASS",
+      "verified_value": "4 models healthy, successRate: 100.0%"
+    },
+    {
+      "token": "[E:server.ts:L31]",
+      "claim": "PORT configured from environment or fallback",
+      "result": "PASS",
+      "verified_value": "PORT comes from the environment"
+    },
+    {
+      "token": "[E:server.ts:L149]",
+      "claim": "Tier 2 model configured as gemini-3.1-flash-lite fallback",
+      "result": "PASS",
+      "verified_value": "gemini-3.1-flash-lite: High throughput, sub-second latency"
+    },
+    {
+      "token": "[E:src/document/tree.ts:L1-L20]",
+      "claim": "Canonical AST tree definitions in src/document/tree.ts",
+      "result": "PASS",
+      "verified_value": "Immutable AST Document nodes and SVG layer tree representation"
+    },
+    {
+      "token": "[E:src/utils/sanitizeSvg.ts:L1-L25]",
+      "claim": "DOMPurify SVG sanitization utility prevents XSS",
+      "result": "PASS",
+      "verified_value": "sanitizeSvg utility removing script, on* handlers, and unsafe elements"
+    },
+    {
+      "token": "[E:server/security/rateLimit.ts:L22-L40]",
+      "claim": "Sliding window in-memory rate limiter per IP",
+      "result": "PASS",
+      "verified_value": "RateLimiter sliding window implementation"
+    },
+    {
+      "token": "[E:server/security/sessions.ts:L1-L25]",
+      "claim": "Server-side HTTP-only cookie session management for OAuth tokens",
+      "result": "PASS",
+      "verified_value": "SessionStore managing crypto session IDs without localStorage token exposure"
+    }
+  ],
+  "spotcheck_pass_rate": "10/10 (100%)",
+  "audit_confidence": 0.98
+}

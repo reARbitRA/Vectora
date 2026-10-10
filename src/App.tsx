@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { IntroLoader } from './components/IntroLoader';
+import { AnimatedIntro } from './components/AnimatedIntro';
 import { MainLayout } from './components/MainLayout';
 import { HomeView } from './components/HomeView';
 import { UnifiedStudio } from './components/UnifiedStudio';
@@ -10,10 +11,12 @@ import { EncyclopediaView } from './components/EncyclopediaView';
 import { GenerationLoader } from './components/GenerationLoader';
 import { CommandPalette } from './components/CommandPalette';
 import { KeyboardShortcutsModal } from './components/KeyboardShortcutsModal';
+import { AIGeneratorModal } from './components/AIGeneratorModal';
 import { Toaster, toast } from 'sonner';
 import { downloadBlob, exportSvgToPng } from './utils/svgParser';
 import { MASTERPIECES } from './data/masterpieces';
 import { Keyboard, Command } from 'lucide-react';
+import { useArtworkSession } from './hooks/useArtworkSession';
 
 export default function App() {
   const [showIntro, setShowIntro] = useState(false);
@@ -21,9 +24,11 @@ export default function App() {
   const [isSidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [currentPrompt, setCurrentPrompt] = useState('');
-  const [currentArtwork, setCurrentArtwork] = useState<any>(MASTERPIECES[0]);
+  const [currentArtwork, setCurrentArtwork] = useArtworkSession(MASTERPIECES[0]);
   const [showCommandPalette, setShowCommandPalette] = useState(false);
   const [showShortcutsModal, setShowShortcutsModal] = useState(false);
+  const [showAiModal, setShowAiModal] = useState(false);
+  const [showAnimatedIntro, setShowAnimatedIntro] = useState(false);
 
   const saveToHistory = useCallback((artwork: any) => {
     if (!artwork || !artwork.id) return;
@@ -38,12 +43,12 @@ export default function App() {
     }
   }, []);
 
-  // Seed initial artwork in history if not already present
+  // Seed active artwork in history if not already present
   useEffect(() => {
-    if (MASTERPIECES[0]) {
-      saveToHistory(MASTERPIECES[0]);
+    if (currentArtwork) {
+      saveToHistory(currentArtwork);
     }
-  }, [saveToHistory]);
+  }, [saveToHistory, currentArtwork]);
 
   // Global SVG Download Action
   const handleDownloadCurrentSvg = useCallback(() => {
@@ -257,6 +262,57 @@ export default function App() {
     }
   };
 
+  const handleGenerateWithParams = async (
+    prompt: string,
+    style: string,
+    complexity: string,
+    paletteMood: string
+  ) => {
+    setCurrentPrompt(prompt);
+    setIsGenerating(true);
+    const toastId = toast.loading('Synthesizing Vector Artwork...', {
+      description: `${style} · ${complexity} complexity · ${paletteMood}`
+    });
+
+    try {
+      const response = await fetch('/api/generate-svg', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt, style, complexity, paletteMood }),
+      });
+
+      if (!response.ok) {
+        let errorDetail = 'Generation failed';
+        try {
+          const errJson = await response.json();
+          if (errJson?.error) errorDetail = errJson.error;
+        } catch (_) {
+          errorDetail = `Server returned status ${response.status}`;
+        }
+        throw new Error(errorDetail);
+      }
+
+      const result = await response.json();
+      if (result.success && result.data) {
+        setCurrentArtwork(result.data);
+        saveToHistory(result.data);
+        setShowAiModal(false);
+        setActiveView('studio');
+        toast.success('Vector Masterpiece Synthesized', { id: toastId });
+      } else {
+        throw new Error(result.error || 'Invalid response received from synthesis engine.');
+      }
+    } catch (error: any) {
+      console.error('Error generating artwork:', error);
+      toast.error('Synthesis Failed', {
+        id: toastId,
+        description: error.message || 'The AI engine encountered an issue. Please try again.'
+      });
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
   const handleUpdateSvg = useCallback((newSvg: string) => {
     setCurrentArtwork((prev: any) => {
       if (!prev) return prev;
@@ -292,6 +348,7 @@ export default function App() {
         artworkTitle={currentArtwork?.title}
         onOpenShortcuts={() => setShowShortcutsModal(true)}
         onOpenCommandPalette={() => setShowCommandPalette(true)}
+        onReplayIntro={() => setShowAnimatedIntro(true)}
       >
         <AnimatePresence mode="wait">
           {activeView === 'home' && (
@@ -306,6 +363,7 @@ export default function App() {
                 onGenerate={handleGenerate} 
                 isGenerating={isGenerating} 
                 onGoToStudio={() => setActiveView('studio')}
+                onOpenAiModal={() => setShowAiModal(true)}
               />
             </motion.div>
           )}
@@ -321,6 +379,7 @@ export default function App() {
               {currentArtwork ? (
                 <UnifiedStudio 
                   artwork={currentArtwork} 
+                  currentPrompt={currentPrompt}
                   onUpdateSvg={handleUpdateSvg}
                   onUpdateArtwork={handleUpdateArtwork}
                   onBack={() => setActiveView('home')}
@@ -360,7 +419,7 @@ export default function App() {
 
           {activeView === 'encyclopedia' && (
             <motion.div key="encyclopedia" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 20 }} className="h-full">
-              <EncyclopediaView />
+              <EncyclopediaView onOpenStudio={() => setActiveView('studio')} />
             </motion.div>
           )}
 
@@ -418,7 +477,21 @@ export default function App() {
           setShowCommandPalette(false);
         }}
         onOpenShortcuts={() => setShowShortcutsModal(true)}
+        onOpenAiModal={() => setShowAiModal(true)}
+        onReplayIntro={() => setShowAnimatedIntro(true)}
         currentArtwork={currentArtwork}
+      />
+
+      <AnimatedIntro
+        isOpen={showAnimatedIntro}
+        onComplete={() => setShowAnimatedIntro(false)}
+      />
+
+      <AIGeneratorModal
+        isOpen={showAiModal}
+        onClose={() => setShowAiModal(false)}
+        onGenerate={handleGenerateWithParams}
+        isGenerating={isGenerating}
       />
 
       <KeyboardShortcutsModal

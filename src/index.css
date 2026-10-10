@@ -1,11 +1,27 @@
 @import "tailwindcss";
 
 @layer base {
-  body {
-    font-family: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
-    background-color: #000000;
-    color: #FFFFFF;
+  :root {
+    --bg: #0A0A0A;
+    --ink: #E0E0E0;
+    --accent: #FFEA00;
+    --highlight: #FF003C;
+    --border: 2px solid #333333;
   }
+
+  body {
+    font-family: 'Space Mono', 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
+    background-color: #0A0A0A;
+    color: #E0E0E0;
+  }
+}
+
+.font-syne {
+  font-family: 'Syne', sans-serif;
+}
+
+.font-mono-space {
+  font-family: 'Space Mono', monospace;
 }
 
 /* Brutalist Custom Scrollbars */

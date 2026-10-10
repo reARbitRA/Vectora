@@ -23,7 +23,8 @@ export interface SafeSvgProps {
 export const SafeSvg: React.FC<SafeSvgProps> = ({ svg, className, style, id, title }) => {
   const { svg: safeMarkup, report } = useMemo(() => sanitizeSvg(svg), [svg]);
 
-  if (process.env.NODE_ENV !== "production" && report.removedElements.length + report.removedAttributes.length > 0) {
+  const isDev = Boolean((import.meta as any).env?.DEV || (typeof process !== "undefined" && process.env?.NODE_ENV !== "production"));
+  if (isDev && report.removedElements.length + report.removedAttributes.length > 0) {
     // Diagnostic only: surfaces that markup was altered by the sanitizer.
     console.warn(
       `[SafeSvg] sanitized markup: removed elements [${report.removedElements.join(", ")}], attributes [${report.removedAttributes.join(", ")}]`,

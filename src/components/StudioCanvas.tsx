@@ -1,6 +1,7 @@
 import { SafeSvg } from './SafeSvg';
 import React, { useRef, useState, useEffect, useMemo } from 'react';
 import { CanvasSettings, LayerSpec, VectorArtwork, WorkspaceLayout } from '../types';
+import { useZoomPan } from '../hooks/useZoomPan';
 import {
   ZoomIn,
   ZoomOut,
@@ -55,11 +56,32 @@ export const StudioCanvas: React.FC<StudioCanvasProps> = ({
   canUndo = false,
   canRedo = false,
 }) => {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [isPanning, setIsPanning] = useState(false);
   const [isSpacePressed, setIsSpacePressed] = useState(false);
-  const [startPan, setStartPan] = useState({ x: 0, y: 0 });
   const [showShortcuts, setShowShortcuts] = useState(false);
+
+  // Zoom & Pan utility hook
+  const {
+    zoom,
+    pan,
+    isPanning,
+    containerRef,
+    zoomIn,
+    zoomOut,
+    setZoom,
+    resetView,
+    fitToView,
+    handleMouseDown,
+    transformStyle,
+  } = useZoomPan({
+    externalZoom: settings.zoom,
+    externalPan: settings.pan,
+    minZoom: 0.1,
+    maxZoom: 8.0,
+    zoomSpeed: 0.12,
+    onUpdate: ({ zoom: nextZoom, pan: nextPan }) => {
+      onUpdateSettings({ zoom: nextZoom, pan: nextPan });
+    },
+  });
 
   // Track Space bar for Space + Drag panning
   useEffect(() => {
@@ -134,65 +156,6 @@ export const StudioCanvas: React.FC<StudioCanvasProps> = ({
     }
   }, [artwork.svg, layers, settings.strokeScale]);
 
-  // Handle Zoom In / Out
-  const handleZoom = (delta: number) => {
-    onUpdateSettings({
-      zoom: parseFloat(Math.min(8, Math.max(0.1, settings.zoom + delta)).toFixed(2)),
-    });
-  };
-
-  const handleSetZoom = (targetZoom: number) => {
-    onUpdateSettings({
-      zoom: targetZoom,
-    });
-  };
-
-  const handleResetView = () => {
-    onUpdateSettings({
-      zoom: 1.0,
-      pan: { x: 0, y: 0 },
-    });
-  };
-
-  const handleFitToView = () => {
-    onUpdateSettings({
-      zoom: 0.85,
-      pan: { x: 0, y: 0 },
-    });
-  };
-
-  // Pan Mouse Handlers
-  const handleMouseDown = (e: React.MouseEvent) => {
-    if (e.button !== 0 && e.button !== 1) return; // Left or Middle click
-    setIsPanning(true);
-    setStartPan({
-      x: e.clientX - settings.pan.x,
-      y: e.clientY - settings.pan.y,
-    });
-  };
-
-  const handleMouseMove = (e: React.MouseEvent) => {
-    if (!isPanning) return;
-    onUpdateSettings({
-      pan: {
-        x: Math.round(e.clientX - startPan.x),
-        y: Math.round(e.clientY - startPan.y),
-      },
-    });
-  };
-
-  const handleMouseUp = () => {
-    setIsPanning(false);
-  };
-
-  // Wheel zoom
-  const handleWheel = (e: React.WheelEvent) => {
-    e.preventDefault();
-    const zoomFactor = e.deltaY < 0 ? 1.12 : 0.89;
-    const newZoom = parseFloat(Math.min(8, Math.max(0.1, settings.zoom * zoomFactor)).toFixed(2));
-    onUpdateSettings({ zoom: newZoom });
-  };
-
   // Background container styling
   const bgClasses = {
     dark: 'bg-[#000000]',
@@ -202,16 +165,13 @@ export const StudioCanvas: React.FC<StudioCanvasProps> = ({
     checker: 'bg-[radial-gradient(#222222_1px,transparent_1px)] [background-size:16px_16px] bg-[#000000]',
   }[settings.bgMode];
 
-  const zoomPercent = Math.round(settings.zoom * 100);
-  const isDefaultZoom = Math.abs(settings.zoom - 1.0) < 0.01 && settings.pan.x === 0 && settings.pan.y === 0;
+  const zoomPercent = Math.round(zoom * 100);
+  const isDefaultZoom = Math.abs(zoom - 1.0) < 0.01 && pan.x === 0 && pan.y === 0;
 
   return (
     <div
       ref={containerRef}
       onMouseDown={handleMouseDown}
-      onMouseMove={handleMouseMove}
-      onMouseUp={handleMouseUp}
-      onWheel={handleWheel}
       className={`relative flex-1 h-full w-full overflow-hidden select-none font-mono ${bgClasses} ${
         isSpacePressed || isPanning ? (isPanning ? 'cursor-grabbing' : 'cursor-grab') : 'cursor-default'
       }`}
@@ -261,9 +221,7 @@ export const StudioCanvas: React.FC<StudioCanvasProps> = ({
       {/* SVG Canvas Artboard Container */}
       <div
         className="absolute inset-0 flex items-center justify-center transition-transform duration-75 ease-out origin-center pointer-events-none"
-        style={{
-          transform: `translate(${settings.pan.x}px, ${settings.pan.y}px) scale(${settings.zoom})`,
-        }}
+        style={transformStyle}
       >
         <div
           id="vector-artboard"
@@ -296,7 +254,7 @@ export const StudioCanvas: React.FC<StudioCanvasProps> = ({
         {/* Zoom Out */}
         <button
           id="btn-zoom-out"
-          onClick={() => handleZoom(-0.15)}
+          onClick={() => zoomOut(0.15)}
           title="Zoom Out (Scroll Down)"
           className="p-1 md:p-1.5 text-[#888888] hover:text-[#FFFFFF] hover:bg-[#222222] transition-colors"
         >
@@ -316,7 +274,7 @@ export const StudioCanvas: React.FC<StudioCanvasProps> = ({
         {/* Zoom In */}
         <button
           id="btn-zoom-in"
-          onClick={() => handleZoom(0.15)}
+          onClick={() => zoomIn(0.15)}
           title="Zoom In (Scroll Up)"
           className="p-1 md:p-1.5 text-[#888888] hover:text-[#FFFFFF] hover:bg-[#222222] transition-colors"
         >
@@ -328,7 +286,7 @@ export const StudioCanvas: React.FC<StudioCanvasProps> = ({
         {/* Dedicated Reset Zoom to 100% Button */}
         <button
           id="btn-reset-zoom-100"
-          onClick={handleResetView}
+          onClick={resetView}
           title="Reset Zoom to 100% & Center Pan (Ctrl+0)"
           className={`flex items-center gap-1 px-1.5 md:px-2.5 py-1 text-[10px] md:text-xs font-bold uppercase transition-all ${
             isDefaultZoom
@@ -343,7 +301,7 @@ export const StudioCanvas: React.FC<StudioCanvasProps> = ({
         {/* Fit View Preset */}
         <button
           id="btn-fit-view"
-          onClick={handleFitToView}
+          onClick={() => fitToView(0.85)}
           title="Fit Artboard to Screen"
           className="px-1.5 md:px-2 py-1 bg-[#141414] hover:bg-[#222222] text-[#888888] hover:text-[#FFFFFF] border border-[#333333] text-[10px] md:text-[11px] font-bold uppercase"
         >

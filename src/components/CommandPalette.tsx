@@ -27,6 +27,8 @@ interface CommandPaletteProps {
   onDownloadPng?: () => void;
   onOpenExport?: () => void;
   onOpenShortcuts?: () => void;
+  onOpenAiModal?: () => void;
+  onReplayIntro?: () => void;
   currentArtwork?: VectorArtwork | null;
 }
 
@@ -49,6 +51,8 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
   onDownloadPng,
   onOpenExport,
   onOpenShortcuts,
+  onOpenAiModal,
+  onReplayIntro,
   currentArtwork,
 }) => {
   const [query, setQuery] = useState('');
@@ -127,6 +131,21 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
         onClose();
       },
     },
+    ...(onOpenAiModal
+      ? [
+          {
+            id: 'cmd-blueprint-modal',
+            title: 'Open AI Blueprint & Style Synthesis Modal',
+            subtitle: 'Fine-tune aesthetic movements (Art Deco, Bauhaus, Cyberpunk) & complexity tiers',
+            icon: Sparkles,
+            category: 'Generation' as const,
+            action: () => {
+              onOpenAiModal();
+              onClose();
+            },
+          },
+        ]
+      : []),
 
     // Export options (available when artwork exists)
     ...(currentArtwork
@@ -183,6 +202,21 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
         onClose();
       },
     },
+    ...(onReplayIntro
+      ? [
+          {
+            id: 'cmd-replay-intro',
+            title: 'Replay Cybernetic Boot Telemetry Sequence',
+            subtitle: 'Launch the kinetic VECTORA geometric kernel animation sequence',
+            icon: Zap,
+            category: 'Help' as const,
+            action: () => {
+              onReplayIntro();
+              onClose();
+            },
+          },
+        ]
+      : []),
   ];
 
   // Filter commands by search query

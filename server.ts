@@ -1026,6 +1026,7 @@ app.post("/api/generate-svg", aiRateLimit, validateApiKey, async (req: Request, 
       style = "Art Deco",
       complexity = "balanced",
       paletteMood = "default",
+      is_variation = false,
     } = req.body;
 
     const prompt = sanitizeString(rawPrompt, 10000);
@@ -1034,7 +1035,24 @@ app.post("/api/generate-svg", aiRateLimit, validateApiKey, async (req: Request, 
       return;
     }
 
-    const userPrompt = `
+    const isVariation = Boolean(is_variation);
+    const userPrompt = isVariation
+      ? `
+Generate a creative variation and new iteration of this vector artwork based on this request:
+User Request: "${prompt}"
+Iteration Mode: VARIATION (Preserve core concept & style archetype, but produce a fresh, innovative variation in composition, geometry, dynamic details, and layout)
+Preferred Aesthetic Style: "${sanitizeString(style, 200)}"
+Target Complexity Level: "${sanitizeString(complexity, 100)}"
+Color Palette Vibe: "${sanitizeString(paletteMood, 200)}"
+
+Ensure the SVG adheres to the complete VECTORA engineering and artistic doctrine:
+- Rich layered groups (<g inkscape:groupmode="layer" inkscape:label="NN_Name">)
+- <defs> containing gradients, patterns, filters
+- <style> block for classes
+- Pure vector paths, circles, polylines, rects, and typography
+- Output MUST be valid JSON conforming to the schema.
+`
+      : `
 Generate a masterpiece vector SVG based on this request:
 User Request: "${prompt}"
 Preferred Aesthetic Style: "${sanitizeString(style, 200)}"
@@ -1064,6 +1082,7 @@ Ensure the SVG adheres to the complete VECTORA engineering and artistic doctrine
         thinkingBudget: result.thinkingBudgetUsed,
         latencyMs: result.latencyMs,
         attempts: result.attempts,
+        isVariation,
       },
     });
   } catch (error: any) {
@@ -1382,7 +1401,7 @@ TASK:
 
 app.post("/api/generate-unified", aiRateLimit, validateApiKey, async (req: Request, res: Response) => {
   try {
-    const { prompt: rawPrompt, image, type } = req.body;
+    const { prompt: rawPrompt, image, type, is_variation = false } = req.body;
 
     const prompt = sanitizeString(rawPrompt, 10000);
     if (!prompt && !image) {
@@ -1390,6 +1409,7 @@ app.post("/api/generate-unified", aiRateLimit, validateApiKey, async (req: Reque
       return;
     }
 
+    const isVariation = Boolean(is_variation);
     let contents: any[] = [];
     let taskType: GenerateOptions["taskType"] = "generate";
 
@@ -1411,9 +1431,13 @@ app.post("/api/generate-unified", aiRateLimit, validateApiKey, async (req: Reque
       }];
       taskType = "vision";
     } else {
+      const promptText = isVariation
+        ? `Generate a creative variation / new iteration of the masterpiece vector SVG based on this request: "${prompt}". Preserve core theme while exploring new composition and geometric arrangements.`
+        : `Generate a masterpiece vector SVG based on this request: "${prompt}"`;
+
       contents = [{
         role: "user",
-        parts: [{ text: `Generate a masterpiece vector SVG based on this request: "${prompt}"` }],
+        parts: [{ text: promptText }],
       }];
     }
 
@@ -1432,6 +1456,7 @@ app.post("/api/generate-unified", aiRateLimit, validateApiKey, async (req: Reque
         thinkingBudget: result.thinkingBudgetUsed,
         latencyMs: result.latencyMs,
         attempts: result.attempts,
+        isVariation,
       },
     });
   } catch (error: any) {

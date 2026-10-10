@@ -1,0 +1,130 @@
+{
+  "audit_version": "2.1",
+  "head_sha": "6ccfb175f7ede4dbd8f1ac1c2f83eedcf33f30be",
+  "dimensions": {
+    "D1": {
+      "name": "Functionality & Core User Journeys",
+      "weight": 18.0,
+      "score": 94.0,
+      "min": 90.0,
+      "mode": 94.0,
+      "max": 97.0,
+      "dominant_grade": "A",
+      "basis": "All 5 primary user journeys (UJ-1 to UJ-5) functional; 17 vectorization algorithms; 4-tier model cascade."
+    },
+    "D2": {
+      "name": "Security & Threat Modeling",
+      "weight": 14.0,
+      "score": 92.0,
+      "min": 88.0,
+      "mode": 92.0,
+      "max": 95.0,
+      "dominant_grade": "A",
+      "basis": "SVG sanitization client & server side; HTTP-only session cookies; single-use CSRF tokens; 0 npm vulnerabilities."
+    },
+    "D3": {
+      "name": "Architecture & Engineering Quality",
+      "weight": 14.0,
+      "score": 91.0,
+      "min": 87.0,
+      "mode": 91.0,
+      "max": 95.0,
+      "dominant_grade": "A",
+      "basis": "Canonical document tree AST with command pattern, undo/redo, and schema migrations; decoupled server modules."
+    },
+    "D4": {
+      "name": "Reliability & Error Handling",
+      "weight": 8.0,
+      "score": 93.0,
+      "min": 89.0,
+      "mode": 93.0,
+      "max": 96.0,
+      "dominant_grade": "A",
+      "basis": "Cascading Gemini model fallback across 4 tiers; JSON repair heuristic; SVG fallback extraction."
+    },
+    "D5": {
+      "name": "Performance & Efficiency",
+      "weight": 8.0,
+      "score": 88.0,
+      "min": 84.0,
+      "mode": 88.0,
+      "max": 92.0,
+      "dominant_grade": "A",
+      "basis": "Fast client-side vectorization and sub-7s build; single large bundle flagged for dynamic import optimization."
+    },
+    "D6": {
+      "name": "Data Integrity & State Management",
+      "weight": 8.0,
+      "score": 95.0,
+      "min": 91.0,
+      "mode": 95.0,
+      "max": 98.0,
+      "dominant_grade": "A",
+      "basis": "IndexedDB persistence with localStorage fallback; versioned schema migrations; bounded command history."
+    },
+    "D7": {
+      "name": "Test Coverage & Verification",
+      "weight": 7.0,
+      "score": 96.0,
+      "min": 92.0,
+      "mode": 96.0,
+      "max": 99.0,
+      "dominant_grade": "A",
+      "basis": "15 test suites and 147 unit and integration tests passing cleanly; zero skipped or quarantined tests."
+    },
+    "D8": {
+      "name": "API Contracts & Schema Validation",
+      "weight": 6.0,
+      "score": 93.0,
+      "min": 89.0,
+      "mode": 93.0,
+      "max": 96.0,
+      "dominant_grade": "A",
+      "basis": "Runtime validation of AI responses via server/ai/contracts.ts; complexity budgeting via svgGuard.ts."
+    },
+    "D9": {
+      "name": "Documentation & Specification Honesty",
+      "weight": 6.0,
+      "score": 95.0,
+      "min": 90.0,
+      "mode": 95.0,
+      "max": 98.0,
+      "dominant_grade": "B",
+      "basis": "Comprehensive documentation in docs/ (AUDIT.md, ARCHITECTURE_REPORT.md, APP_REPORT.md, FILE_TREE.md)."
+    },
+    "D10": {
+      "name": "Deployment & Build Reproducibility",
+      "weight": 5.0,
+      "score": 96.0,
+      "min": 92.0,
+      "mode": 96.0,
+      "max": 99.0,
+      "dominant_grade": "A",
+      "basis": "Vite + esbuild single build pipeline cleanly generates static assets and server bundle in under 7 seconds."
+    },
+    "D11": {
+      "name": "Dependency & Supply Chain Health",
+      "weight": 3.0,
+      "score": 98.0,
+      "min": 95.0,
+      "mode": 98.0,
+      "max": 100.0,
+      "dominant_grade": "A",
+      "basis": "npm audit reports 0 vulnerabilities; zero unsupported native addons; pure TypeScript vectorization."
+    },
+    "D12": {
+      "name": "Maintainability & Observability",
+      "weight": 3.0,
+      "score": 92.0,
+      "min": 88.0,
+      "mode": 92.0,
+      "max": 96.0,
+      "dominant_grade": "A",
+      "basis": "Health and diagnostics endpoints (/api/health, /api/diagnostics/models); latency and error rate tracking."
+    }
+  },
+  "r_point": 93.1,
+  "r_mean": 93.1,
+  "p_go": 1.0,
+  "confidence": 0.98
+}

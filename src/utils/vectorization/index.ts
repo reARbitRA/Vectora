@@ -383,7 +383,8 @@ export function runVectorization(
 }
 
 // Production facade (kept in a separate module to avoid making the algorithm registry circular).
-export { VectorizationEngine, techniqueCatalog } from './engine';
+export { VectorizationEngine } from './engine';
+export const techniqueCatalog = VECTORIZATION_TECHNIQUES;
 export type { VectorizationOptions, VectorizationResult } from './engine';
 export { traceMarchingSquares } from './marchingSquares';
 export { approximateFourier } from './fourierApproximator';

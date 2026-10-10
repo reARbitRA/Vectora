@@ -1198,11 +1198,45 @@ export interface PaletteUsageAnalysis {
 }
 
 /**
- * Normalizes hex string for consistent comparison (e.g. #00ff00 -> #00FF00, #0f0 -> #00FF00)
+ * Normalizes hex string or PaletteColor object for consistent comparison
+ * (e.g. #00ff00 -> #00FF00, #0f0 -> #00FF00, or { hex: '#00ff00' } -> #00FF00)
  */
-export function normalizeHex(hex: string): string {
+export function normalizeHex(hex: unknown): string {
   if (!hex) return '';
-  let clean = hex.trim().toUpperCase();
+  let raw = '';
+  if (typeof hex === 'string') {
+    raw = hex;
+  } else if (typeof hex === 'number') {
+    raw = String(hex);
+  } else if (typeof hex === 'object' && hex !== null) {
+    const obj = hex as any;
+    if (typeof obj.hex === 'string') {
+      raw = obj.hex;
+    } else if (typeof obj.value === 'string') {
+      raw = obj.value;
+    } else if (obj.hex && typeof obj.hex === 'object' && typeof obj.hex.hex === 'string') {
+      raw = obj.hex.hex;
+    } else {
+      try {
+        raw = String(obj.hex || obj.value || '');
+      } catch {
+        raw = '';
+      }
+    }
+  } else {
+    raw = String(hex);
+  }
+
+  if (typeof raw !== 'string') {
+    try {
+      raw = String(raw || '');
+    } catch {
+      raw = '';
+    }
+  }
+
+  let clean = raw.trim().toUpperCase();
+  if (!clean || clean === 'NONE' || clean === 'TRANSPARENT' || clean === '[OBJECT OBJECT]') return '';
   if (!clean.startsWith('#')) clean = `#${clean}`;
   if (clean.length === 4) {
     // #RGB -> #RRGGBB
@@ -1217,9 +1251,9 @@ export function normalizeHex(hex: string): string {
  */
 export function analyzePaletteColorUsage(
   svgString: string,
-  paletteColors: string[]
+  paletteColors: (string | { hex?: string } | any)[]
 ): PaletteUsageAnalysis {
-  const normPalette = Array.from(new Set(paletteColors.map(normalizeHex)));
+  const normPalette = Array.from(new Set((paletteColors || []).map(normalizeHex).filter(Boolean)));
   const usageMap: Record<
     string,
     { count: number; elements: Record<string, { tag: string; attr: string; count: number }> }
