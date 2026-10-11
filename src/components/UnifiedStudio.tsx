@@ -211,35 +211,76 @@ export const UnifiedStudio: React.FC<UnifiedStudioProps> = ({
     toast.info('Redo applied', { description: result.entry.label });
   };
 
-  /** Resolve a layer's stable node uid from its panel name. */
-  const layerUid = (name: string): string | null =>
-    layers.find((l) => l.name === name)?.id ?? (vectorDoc ? layerUidByName(vectorDoc, name) : null);
-
-  const handleToggleLayer = (name: string) => {
-    const uid = layerUid(name);
-    if (!uid) return;
-    const layer = layers.find((l) => l.name === name);
-    const nextVisible = layer ? !layer.visible : true;
-    // Visibility is persisted into the document (display="none") — exports,
-    // reloads, and the code view all read the same state.
-    applyCommands(
-      new SetNodeAttrCommand(uid, 'display', nextVisible ? null : 'none'),
-      `${nextVisible ? 'Show' : 'Hide'} ${name}`,
-    );
+  /** Resolve a layer's stable node uid from its panel name or element id. */
+  const layerUid = (name: string, id?: string): string | null => {
+    if (id) {
+      const byId = layers.find((l) => l.id === id)?.id ?? (vectorDoc ? layerUidByName(vectorDoc, id) : null);
+      if (byId) return byId;
+    }
+    return layers.find((l) => l.name === name)?.id ?? (vectorDoc ? layerUidByName(vectorDoc, name) : null);
   };
 
-  const handleToggleLock = (name: string) => {
-    const uid = layerUid(name);
-    if (!uid) return;
-    const layer = layers.find((l) => l.name === name);
+  const handleToggleLayer = (name: string, id?: string) => {
+    const uid = layerUid(name, id);
+    const layer = layers.find((l) => l.name === name || l.id === id);
+    const nextVisible = layer ? !layer.visible : true;
+    if (uid) {
+      applyCommands(
+        new SetNodeAttrCommand(uid, 'display', nextVisible ? null : 'none'),
+        `${nextVisible ? 'Show' : 'Hide'} ${name}`,
+      );
+    } else if (exportedSvg) {
+      try {
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(exportedSvg, 'image/svg+xml');
+        const el = (id && doc.getElementById(id)) || doc.querySelector(`[inkscape\\:label="${name}"]`) || doc.querySelector(`[id="${name}"]`);
+        if (el) {
+          if (nextVisible) {
+            el.removeAttribute('display');
+          } else {
+            el.setAttribute('display', 'none');
+          }
+          const nextSvg = new XMLSerializer().serializeToString(doc);
+          handleExternalSvgChange(nextSvg, `${nextVisible ? 'Show' : 'Hide'} ${name}`, 'layer-toggle');
+        }
+      } catch (err) {
+        console.error('Failed to toggle SVG element display:', err);
+      }
+    }
+  };
+
+  const handleToggleLock = (name: string, id?: string) => {
+    const uid = layerUid(name, id);
+    const layer = layers.find((l) => l.name === name || l.id === id);
     const nextLocked = layer ? !layer.locked : true;
-    applyCommands(
-      [
-        new SetNodeAttrCommand(uid, 'pointer-events', nextLocked ? 'none' : null),
-        new SetNodeAttrCommand(uid, 'data-locked', nextLocked ? 'true' : null),
-      ],
-      `${nextLocked ? 'Lock' : 'Unlock'} ${name}`,
-    );
+    if (uid) {
+      applyCommands(
+        [
+          new SetNodeAttrCommand(uid, 'pointer-events', nextLocked ? 'none' : null),
+          new SetNodeAttrCommand(uid, 'data-locked', nextLocked ? 'true' : null),
+        ],
+        `${nextLocked ? 'Lock' : 'Unlock'} ${name}`,
+      );
+    } else if (exportedSvg) {
+      try {
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(exportedSvg, 'image/svg+xml');
+        const el = (id && doc.getElementById(id)) || doc.querySelector(`[inkscape\\:label="${name}"]`) || doc.querySelector(`[id="${name}"]`);
+        if (el) {
+          if (nextLocked) {
+            el.setAttribute('pointer-events', 'none');
+            el.setAttribute('data-locked', 'true');
+          } else {
+            el.removeAttribute('pointer-events');
+            el.removeAttribute('data-locked');
+          }
+          const nextSvg = new XMLSerializer().serializeToString(doc);
+          handleExternalSvgChange(nextSvg, `${nextLocked ? 'Lock' : 'Unlock'} ${name}`, 'layer-lock');
+        }
+      } catch (err) {
+        console.error('Failed to toggle SVG element lock:', err);
+      }
+    }
   };
 
   const handleRenameLayer = (oldName: string, newName: string) => {
@@ -290,10 +331,76 @@ export const UnifiedStudio: React.FC<UnifiedStudioProps> = ({
     applyCommands(new AddNodeCommand(createLayerNode(name), null, null), `Add layer ${name}`);
   };
 
-  const handleSetBlendMode = (name: string, mode: string) => {
-    const uid = layerUid(name);
-    if (!uid || !vectorDoc) return;
-    applyCommands(buildBlendModeCommands(vectorDoc, uid, mode), `Set ${name} blend to ${mode}`);
+  const handleAddNewFolder = (folderName?: string) => {
+    const name = folderName?.trim() || `Folder_${layers.length + 1}`;
+    applyCommands(new AddNodeCommand(createLayerNode(name), null, null), `Add folder ${name}`);
+    toast.success(`Group folder "${name}" created`);
+  };
+
+  const handleSetBlendMode = (name: string, mode: string, id?: string) => {
+    const uid = layerUid(name, id);
+    if (uid && vectorDoc) {
+      applyCommands(buildBlendModeCommands(vectorDoc, uid, mode), `Set ${name} blend to ${mode}`);
+    } else if (exportedSvg) {
+      try {
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(exportedSvg, 'image/svg+xml');
+        const el = (id && doc.getElementById(id)) || doc.querySelector(`[inkscape\\:label="${name}"]`) || doc.querySelector(`[id="${name}"]`);
+        if (el) {
+          if (mode === 'normal') {
+            el.removeAttribute('mix-blend-mode');
+            const style = el.getAttribute('style') || '';
+            el.setAttribute('style', style.replace(/mix-blend-mode:[^;]+;?/gi, '').trim());
+          } else {
+            el.setAttribute('mix-blend-mode', mode);
+          }
+          const nextSvg = new XMLSerializer().serializeToString(doc);
+          handleExternalSvgChange(nextSvg, `Set ${name} blend to ${mode}`, 'layer-blend');
+        }
+      } catch (err) {
+        console.error('Failed to set blend mode on SVG:', err);
+      }
+    }
+  };
+
+  const handleSetPerspective = (name: string, perspectiveType: string, id?: string) => {
+    const transforms: Record<string, string | null> = {
+      'isometric-left': 'matrix(0.866, 0.5, 0, 0.866, 0, 0)',
+      'isometric-right': 'matrix(0.866, -0.5, 0, 0.866, 0, 0)',
+      'isometric-top': 'matrix(0.866, 0.5, -0.866, 0.5, 0, 0)',
+      'perspective-tilt': 'matrix(1, 0.15, -0.2, 1, 0, 0)',
+      'cabinet-oblique': 'matrix(1, 0, 0.353, 0.707, 0, 0)',
+      'reset': null,
+    };
+    const transformVal = transforms[perspectiveType] ?? null;
+    const uid = layerUid(name, id);
+    if (uid) {
+      applyCommands(
+        new SetNodeAttrCommand(uid, 'transform', transformVal),
+        `${transformVal ? 'Apply ' + perspectiveType : 'Reset perspective'} on ${name}`,
+      );
+      toast.success(transformVal ? `${perspectiveType} applied` : 'Perspective reset', {
+        description: `Updated transform on ${name}`,
+      });
+    } else if (exportedSvg) {
+      try {
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(exportedSvg, 'image/svg+xml');
+        const el = (id && doc.getElementById(id)) || doc.querySelector(`[inkscape\\:label="${name}"]`) || doc.querySelector(`[id="${name}"]`);
+        if (el) {
+          if (transformVal) {
+            el.setAttribute('transform', transformVal);
+          } else {
+            el.removeAttribute('transform');
+          }
+          const nextSvg = new XMLSerializer().serializeToString(doc);
+          handleExternalSvgChange(nextSvg, `Apply ${perspectiveType} to ${name}`, 'layer-perspective');
+          toast.success(transformVal ? `${perspectiveType} applied` : 'Perspective reset');
+        }
+      } catch (err) {
+        console.error('Failed to set perspective on SVG:', err);
+      }
+    }
   };
 
   /**
@@ -820,24 +927,28 @@ export const UnifiedStudio: React.FC<UnifiedStudioProps> = ({
         </div>
       </div>
 
-      {/* Active Tool Panel */}
+      {/* Active Tool Panel (Drawer for sidebar inspectors) */}
       <AnimatePresence mode="wait">
-        {activeTool && (
+        {activeTool && activeTool !== 'animation' && (
           <motion.div
-            initial={{ x: -300, opacity: 0 }}
+            initial={{ x: -320, opacity: 0 }}
             animate={{ x: 0, opacity: 1 }}
-            exit={{ x: -300, opacity: 0 }}
-            className="z-10 w-80 border-r border-white/5 bg-[#0d0d0d] shadow-2xl"
+            exit={{ x: -320, opacity: 0 }}
+            className="z-20 w-80 md:w-96 border-r border-[#1F1F1F] bg-[#0C0C0C] shadow-2xl flex flex-col h-full shrink-0"
           >
-            <div className="flex h-12 items-center justify-between border-b border-white/5 px-4">
-              <span className="text-sm font-bold uppercase tracking-widest text-white/60">
-                {activeTool}
+            <div className="flex h-11 items-center justify-between border-b border-[#1F1F1F] px-3.5 bg-[#0A0A0A] shrink-0">
+              <span className="text-xs font-bold uppercase tracking-widest text-[#00FF00]">
+                {tools.find((t) => t.id === activeTool)?.label || activeTool}
               </span>
-              <button onClick={() => setActiveTool(null)} className="text-white/20 hover:text-white">
-                <ChevronLeft size={16} />
+              <button
+                onClick={() => setActiveTool(null)}
+                className="text-[#888888] hover:text-[#FFFFFF] p-1"
+                title="Close Inspector"
+              >
+                <X size={15} />
               </button>
             </div>
-            <div className="h-[calc(100%-3rem)] overflow-y-auto">
+            <div className="flex-1 overflow-y-auto custom-scrollbar">
               {activeTool === 'layers' && (
                 <LayerPanel 
                   layers={layers} 
@@ -850,7 +961,9 @@ export const UnifiedStudio: React.FC<UnifiedStudioProps> = ({
                   onClose={() => setActiveTool(null)} 
                   onReorderLayer={handleReorderLayer}
                   onAddNewLayer={handleAddNewLayer}
+                  onAddNewFolder={handleAddNewFolder}
                   onSetBlendMode={handleSetBlendMode}
+                  onSetPerspective={handleSetPerspective}
                 />
               )}
               {activeTool === 'colors' && (
@@ -866,13 +979,6 @@ export const UnifiedStudio: React.FC<UnifiedStudioProps> = ({
                   onUpdateSettings={handleUpdateSettings}
                   onApplyPaletteTheme={handleApplyPaletteTheme}
                   onClose={() => setActiveTool(null)}
-                />
-              )}
-              {activeTool === 'animation' && (
-                <AnimationStudio
-                  artwork={artwork}
-                  onUpdateSvg={(svg) => handleExternalSvgChange(svg, 'Apply animation', 'animation-bake')}
-                  onSwitchToCanvas={() => setActiveTool(null)}
                 />
               )}
               {activeTool === 'components' && (
@@ -900,87 +1006,97 @@ export const UnifiedStudio: React.FC<UnifiedStudioProps> = ({
         )}
       </AnimatePresence>
 
-      {/* Canvas Viewport */}
-      <div className="relative flex-1 overflow-hidden">
-        {/* Quick Direct Export & Action HUD */}
-        <div className="absolute top-3 right-3 sm:top-4 sm:right-4 z-30 flex items-center gap-1.5 font-mono">
-          {/* Generate Variation Button */}
-          <button
-            id="btn-generate-variation"
-            onClick={handleGenerateVariation}
-            disabled={isGeneratingVariation}
-            title={`Generate Variation of "${artwork.title}" with current prompt (is_variation=true)`}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-[#FFEA00] hover:bg-[#FFEE33] text-[#000000] border border-[#FFEA00] text-xs font-bold uppercase tracking-wider rounded-lg shadow-lg hover:shadow-[0_0_15px_rgba(255,234,0,0.4)] transition-all disabled:opacity-50 disabled:cursor-not-allowed group"
-          >
-            {isGeneratingVariation ? (
-              <>
-                <Loader2 size={13} className="animate-spin text-black" />
-                <span>Generating...</span>
-              </>
-            ) : (
-              <>
-                <Sparkles size={13} className="text-black group-hover:rotate-12 transition-transform" />
-                <span className="hidden sm:inline">Generate Variation</span>
-                <span className="sm:hidden">Variation</span>
-              </>
-            )}
-          </button>
-
-          <button
-            onClick={handleDownloadSvg}
-            title="Download Vector .SVG (Ctrl+Shift+S)"
-            className="flex items-center gap-1.5 px-2.5 py-1.5 bg-[#0D0D0D]/90 hover:bg-[#1A1A1A] border border-white/10 hover:border-[#00FF00] text-xs font-semibold text-white rounded-lg shadow-lg backdrop-blur-md transition-all group"
-          >
-            <Download size={13} className="text-[#00FF00] group-hover:scale-110 transition-transform" />
-            <span>.SVG</span>
-          </button>
-
-          <button
-            onClick={() => handleDownloadPng(2)}
-            disabled={isExportingPng}
-            title="Download High-Res .PNG (Ctrl+Shift+P)"
-            className="flex items-center gap-1.5 px-2.5 py-1.5 bg-[#0D0D0D]/90 hover:bg-[#1A1A1A] border border-white/10 hover:border-emerald-400 text-xs font-semibold text-white rounded-lg shadow-lg backdrop-blur-md transition-all group disabled:opacity-50"
-          >
-            <ImageIcon size={13} className="text-emerald-400 group-hover:scale-110 transition-transform" />
-            <span>{isExportingPng ? 'Rendering...' : '.PNG'}</span>
-          </button>
-
-          <button
-            onClick={() => setIsExportModalOpen(true)}
-            title="Open Advanced Export Studio (Ctrl+E)"
-            className="flex items-center gap-1 px-2.5 py-1.5 bg-[#0D0D0D]/90 hover:bg-[#1A1A1A] border border-white/10 hover:border-white/30 text-xs font-semibold text-white/70 hover:text-white rounded-lg shadow-lg backdrop-blur-md transition-all"
-          >
-            <span>Export</span>
-            <ExternalLink size={12} className="text-white/40" />
-          </button>
+      {/* Main Workspace Area: Either Full Animation Studio or Canvas Viewport */}
+      {activeTool === 'animation' ? (
+        <div className="flex-1 h-full flex flex-col overflow-hidden bg-[#000000]">
+          <AnimationStudio
+            artwork={artwork}
+            onUpdateSvg={(svg) => handleExternalSvgChange(svg, 'Apply animation', 'animation-bake')}
+            onSwitchToCanvas={() => setActiveTool(null)}
+          />
         </div>
+      ) : (
+        <div className="relative flex-1 flex flex-col h-full overflow-hidden">
+          {/* Quick Direct Export & Action HUD */}
+          <div className="absolute top-3 right-3 sm:top-4 sm:right-4 z-30 flex items-center gap-1.5 font-mono">
+            {/* Generate Variation Button */}
+            <button
+              id="btn-generate-variation"
+              onClick={handleGenerateVariation}
+              disabled={isGeneratingVariation}
+              title={`Generate Variation of "${artwork.title}" with current prompt (is_variation=true)`}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-[#FFEA00] hover:bg-[#FFEE33] text-[#000000] border border-[#FFEA00] text-xs font-bold uppercase tracking-wider rounded-lg shadow-lg hover:shadow-[0_0_15px_rgba(255,234,0,0.4)] transition-all disabled:opacity-50 disabled:cursor-not-allowed group"
+            >
+              {isGeneratingVariation ? (
+                <>
+                  <Loader2 size={13} className="animate-spin text-black" />
+                  <span>Generating...</span>
+                </>
+              ) : (
+                <>
+                  <Sparkles size={13} className="text-black group-hover:rotate-12 transition-transform" />
+                  <span className="hidden sm:inline">Generate Variation</span>
+                  <span className="sm:hidden">Variation</span>
+                </>
+              )}
+            </button>
 
-        <StudioCanvas 
-          artwork={artwork} 
-          layers={layers} 
-          settings={canvasSettings}
-          workspaceLayout="canvas-focus"
-          onSelectLayout={() => {}}
-          onToggleLayers={() => setActiveTool(activeTool === 'layers' ? null : 'layers')}
-          showLayers={activeTool === 'layers'}
-          onOpenExport={() => setIsExportModalOpen(true)}
-          onOpenImport={() => setIsImportModalOpen(true)}
-          onOpenAnimator={() => setActiveTool('animation')}
-          onUpdateSettings={handleUpdateSettings}
-          onUndo={handleUndo}
-          onRedo={handleRedo}
-          canUndo={historyFlags.canUndo}
-          canRedo={historyFlags.canRedo}
-        />
+            <button
+              onClick={handleDownloadSvg}
+              title="Download Vector .SVG (Ctrl+Shift+S)"
+              className="flex items-center gap-1.5 px-2.5 py-1.5 bg-[#0D0D0D]/90 hover:bg-[#1A1A1A] border border-white/10 hover:border-[#00FF00] text-xs font-semibold text-white rounded-lg shadow-lg backdrop-blur-md transition-all group"
+            >
+              <Download size={13} className="text-[#00FF00] group-hover:scale-110 transition-transform" />
+              <span>.SVG</span>
+            </button>
 
-        {/* Real-Time On-Canvas Prompt Refinement & Variation Trigger */}
-        <RefinePromptBar
-          onRefine={handleRefine}
-          isRefining={isRefining}
-          onGenerateVariation={handleGenerateVariation}
-          isGeneratingVariation={isGeneratingVariation}
-        />
-      </div>
+            <button
+              onClick={() => handleDownloadPng(2)}
+              disabled={isExportingPng}
+              title="Download High-Res .PNG (Ctrl+Shift+P)"
+              className="flex items-center gap-1.5 px-2.5 py-1.5 bg-[#0D0D0D]/90 hover:bg-[#1A1A1A] border border-white/10 hover:border-emerald-400 text-xs font-semibold text-white rounded-lg shadow-lg backdrop-blur-md transition-all group disabled:opacity-50"
+            >
+              <ImageIcon size={13} className="text-emerald-400 group-hover:scale-110 transition-transform" />
+              <span>{isExportingPng ? 'Rendering...' : '.PNG'}</span>
+            </button>
+
+            <button
+              onClick={() => setIsExportModalOpen(true)}
+              title="Open Advanced Export Studio (Ctrl+E)"
+              className="flex items-center gap-1 px-2.5 py-1.5 bg-[#0D0D0D]/90 hover:bg-[#1A1A1A] border border-white/10 hover:border-white/30 text-xs font-semibold text-white/70 hover:text-white rounded-lg shadow-lg backdrop-blur-md transition-all"
+            >
+              <span>Export</span>
+              <ExternalLink size={12} className="text-white/40" />
+            </button>
+          </div>
+
+          <StudioCanvas 
+            artwork={artwork} 
+            layers={layers} 
+            settings={canvasSettings}
+            workspaceLayout="canvas-focus"
+            onSelectLayout={() => {}}
+            onToggleLayers={() => setActiveTool(activeTool === 'layers' ? null : 'layers')}
+            showLayers={activeTool === 'layers'}
+            onOpenExport={() => setIsExportModalOpen(true)}
+            onOpenImport={() => setIsImportModalOpen(true)}
+            onOpenAnimator={() => setActiveTool('animation')}
+            onUpdateSettings={handleUpdateSettings}
+            onUndo={handleUndo}
+            onRedo={handleRedo}
+            canUndo={historyFlags.canUndo}
+            canRedo={historyFlags.canRedo}
+          />
+
+          {/* Real-Time On-Canvas Prompt Refinement & Variation Trigger */}
+          <RefinePromptBar
+            onRefine={handleRefine}
+            isRefining={isRefining}
+            onGenerateVariation={handleGenerateVariation}
+            isGeneratingVariation={isGeneratingVariation}
+          />
+        </div>
+      )}
 
       {/* Modals */}
       <ExportModal 

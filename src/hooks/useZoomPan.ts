@@ -112,6 +112,11 @@ export function useZoomPan(options: UseZoomPanOptions = {}): UseZoomPanReturn {
 
   // Focal point wheel zoom
   const handleWheel = useCallback((e: WheelEvent | React.WheelEvent) => {
+    const target = e.target as HTMLElement | null;
+    if (target && target.closest('select, input, textarea, button, [data-scrollable="true"], .custom-scrollbar')) {
+      return;
+    }
+
     if ('preventDefault' in e && typeof e.preventDefault === 'function') {
       e.preventDefault();
     }

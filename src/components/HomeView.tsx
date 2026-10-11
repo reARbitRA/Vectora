@@ -12,6 +12,7 @@ interface HomeViewProps {
 export const HomeView: React.FC<HomeViewProps> = ({ onGenerate, isGenerating, onGoToStudio, onOpenAiModal }) => {
   const [prompt, setPrompt] = useState('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -20,18 +21,38 @@ export const HomeView: React.FC<HomeViewProps> = ({ onGenerate, isGenerating, on
     onGenerate(prompt, selectedFile || undefined);
     setPrompt('');
     setSelectedFile(null);
+    if (previewUrl) {
+      URL.revokeObjectURL(previewUrl);
+      setPreviewUrl(null);
+    }
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       setSelectedFile(file);
+      if (file.type.startsWith('image/') || file.name.endsWith('.svg')) {
+        const url = URL.createObjectURL(file);
+        setPreviewUrl(url);
+      } else {
+        setPreviewUrl(null);
+      }
     }
   };
 
   const removeFile = () => {
+    if (previewUrl) {
+      URL.revokeObjectURL(previewUrl);
+      setPreviewUrl(null);
+    }
     setSelectedFile(null);
     if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const handleApplyStyleTag = (styleName: string) => {
+    if (!prompt.includes(styleName)) {
+      setPrompt((prev) => (prev ? `${prev}, in ${styleName} style` : `Vectorize in ${styleName} style with intricate geometric paths and rich layer hierarchy`));
+    }
   };
 
   return (
@@ -70,25 +91,59 @@ export const HomeView: React.FC<HomeViewProps> = ({ onGenerate, isGenerating, on
 
             {selectedFile && (
               <motion.div
-                initial={{ opacity: 0, scale: 0.9 }}
+                initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
-                className="flex items-center gap-3 rounded-xl bg-white/5 p-3 pr-2"
+                className="flex flex-col gap-2 rounded-2xl bg-black/40 border border-white/10 p-3"
               >
-                {selectedFile.type.startsWith('image/') ? (
-                  <ImageIcon className="h-5 w-5 text-blue-400" />
-                ) : (
-                  <FileText className="h-5 w-5 text-blue-400" />
-                )}
-                <span className="flex-1 truncate text-sm text-white/70">
-                  {selectedFile.name}
-                </span>
-                <button
-                  type="button"
-                  onClick={removeFile}
-                  className="rounded-lg p-1 text-white/30 transition-colors hover:bg-white/10 hover:text-white"
-                >
-                  <X className="h-4 w-4" />
-                </button>
+                <div className="flex items-center gap-3">
+                  {previewUrl ? (
+                    <img
+                      src={previewUrl}
+                      alt="Reference Preview"
+                      className="h-14 w-14 rounded-lg object-cover border border-white/20 shrink-0"
+                    />
+                  ) : selectedFile.type.startsWith('image/') ? (
+                    <ImageIcon className="h-6 w-6 text-blue-400 shrink-0" />
+                  ) : (
+                    <FileText className="h-6 w-6 text-blue-400 shrink-0" />
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-semibold text-white truncate">
+                        {selectedFile.name}
+                      </span>
+                      <span className="text-[10px] uppercase font-mono px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-300 border border-blue-500/30">
+                        Reference
+                      </span>
+                    </div>
+                    <span className="text-xs text-white/40 font-mono">
+                      {(selectedFile.size / 1024).toFixed(1)} KB · Ready to synthesize
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={removeFile}
+                    title="Remove reference image"
+                    className="rounded-lg p-1.5 text-white/40 hover:bg-white/10 hover:text-white transition-colors"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+
+                {/* Quick Vector Style Preset Directives */}
+                <div className="flex items-center gap-1.5 pt-2 border-t border-white/5 flex-wrap">
+                  <span className="text-[10px] text-white/40 uppercase font-mono mr-1">Style Target:</span>
+                  {['Faithful Vector Trace', 'Swiss Bauhaus', 'Cyberpunk Brutalist', 'Art Deco Geometric', 'Minimalist Line Art'].map((styleTag) => (
+                    <button
+                      key={styleTag}
+                      type="button"
+                      onClick={() => handleApplyStyleTag(styleTag)}
+                      className="text-[10px] px-2 py-0.5 rounded-full bg-white/5 hover:bg-white/15 text-white/70 hover:text-white border border-white/10 transition-colors"
+                    >
+                      {styleTag}
+                    </button>
+                  ))}
+                </div>
               </motion.div>
             )}
           </div>

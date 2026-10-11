@@ -517,6 +517,7 @@ export const AnimationStudio: React.FC<AnimationStudioProps> = ({
           {/* VISUAL KEYFRAME TIMELINE BAR */}
           <KeyframeTimeline
             config={config}
+            layers={layers}
             onChangeConfig={handleUpdateConfig}
             onTogglePlay={handleTogglePlay}
           />

@@ -104,6 +104,7 @@ export type StudioTab = 'canvas' | 'editor' | 'specs' | 'gallery' | 'generator' 
 export type WorkspaceLayout = 'full' | 'minimalist' | 'canvas-focus';
 
 export type AnimationPresetId =
+  | 'custom-timeline'
   | 'orchestrated-composite'
   | 'pulse-breath'
   | 'orbit-spin'
@@ -146,11 +147,25 @@ export type AnimationPresetId =
 
 export type AnimationLoopMode = 'infinite' | 'once' | 'alternate';
 
+export interface KeyframeTransform {
+  scale?: number;
+  rotate?: number; // in degrees
+  translateX?: number; // in px
+  translateY?: number; // in px
+  opacity?: number; // 0 to 1
+  skewX?: number; // in degrees
+  skewY?: number; // in degrees
+}
+
 export interface KeyframeNode {
   id: string;
   percentage: number; // 0 to 100
   label: string;
   isRemovable?: boolean;
+  action?: string; // e.g. 'Scale Pulse', 'Spin Rotate', 'Float Levitate', 'Fade', 'Custom'
+  targetLayer?: string; // target layer name or 'all'
+  easing?: string; // e.g. 'ease-in-out', 'linear', 'cubic-bezier(...)', 'ease-out'
+  transform?: KeyframeTransform;
 }
 
 export interface LayerAnimationConfig {

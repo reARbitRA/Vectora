@@ -1422,10 +1422,40 @@ app.post("/api/generate-unified", aiRateLimit, validateApiKey, async (req: Reque
         return;
       }
 
+      const visionPrompt = `
+You are VECTORA — Master Vector Graphics & Generative SVG Architect.
+Analyze the provided reference image with extreme visual precision. Deconstruct its composition, focal subjects, silhouettes, geometry, color palette, lighting gradients, and depth layers.
+Synthesize a museum-grade, production-quality, pure vector SVG masterpiece inspired by it.
+
+USER DIRECTIVE: "${prompt || "Faithfully capture the subject, silhouette, aesthetic, composition, and color relationships of this reference image into a multi-layer vector SVG artwork."}"
+
+CRITICAL VECTOR CRAFTSMANSHIP INSTRUCTIONS:
+1. PURE VECTOR GEOMETRY:
+   - Root <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000" width="100%" height="100%">.
+   - Absolutely zero bitmap rasters (<image>) or embedded base64. Everything must be mathematical vector curves, paths (<path d="...">), circles, rects, and polygons.
+   - Craft smooth cubic/quadratic Bézier curves with crisp coordinates.
+
+2. MULTI-LAYER INKSCAPE STRUCTURE (minimum 4-7 structured layers in draw order):
+   - <g id="layer-01-bg" inkscape:groupmode="layer" inkscape:label="01_Background">
+   - <g id="layer-02-shapes" inkscape:groupmode="layer" inkscape:label="02_Shapes_Primary">
+   - <g id="layer-03-core" inkscape:groupmode="layer" inkscape:label="03_Artwork_Core">
+   - <g id="layer-04-details" inkscape:groupmode="layer" inkscape:label="04_Details_Secondary">
+   - <g id="layer-05-accents" inkscape:groupmode="layer" inkscape:label="05_Accents_Highlights">
+   - <g id="layer-06-fx" inkscape:groupmode="layer" inkscape:label="06_FX_Overlays">
+
+3. PALETTE & GRADIENTS:
+   - Sample dominant, accent, and shadow colors from the image into <defs> with linear and radial gradients.
+   - Include palette metadata array with roles: background, primary, secondary, accent, ink.
+
+4. DETAIL & COMPLETENESS:
+   - Do NOT output a single trivial path or an empty box. Output rich vector fidelity (40 to 100+ intentional elements) that captures the character of the reference image.
+   - Output MUST be valid parseable JSON conforming to the VECTORA schema.
+`;
+
       contents = [{
         role: "user",
         parts: [
-          { text: `Analyze this image and create a vector SVG artwork inspired by it. User request: "${prompt || "Recreate this style"}"` },
+          { text: visionPrompt },
           { inlineData: { mimeType, data: base64Data } },
         ],
       }];

@@ -95,15 +95,31 @@ export function layersFromDocument(doc: VectorDocument): LayerSpec[] {
   return layers;
 }
 
-/** Find a layer's uid by its (panel-displayed) name. */
+/** Find a layer or element's uid by its (panel-displayed) name, id, or uid. */
 export function layerUidByName(doc: VectorDocument, name: string): string | null {
   const page = doc.pages[0];
   if (!page) return null;
+
+  // 1. Check direct top-level layer children first
   for (const child of page.children) {
-    if (child.type !== 'element' || child.kind !== 'g') continue;
+    if (child.type !== 'element') continue;
     const candidate =
       child.attrs['inkscape:label'] || child.attrs['id'] || 'Unnamed_Layer';
-    if (candidate === name) return child.uid;
+    if (candidate === name || child.uid === name || child.attrs['id'] === name) {
+      return child.uid;
+    }
   }
-  return null;
+
+  // 2. Search deeply across all elements in the document
+  let foundUid: string | null = null;
+  walkElements(doc, (node) => {
+    if (foundUid) return;
+    const candidate =
+      node.attrs['inkscape:label'] || node.attrs['id'] || '';
+    if (candidate === name || node.uid === name || node.attrs['id'] === name) {
+      foundUid = node.uid;
+    }
+  });
+
+  return foundUid;
 }

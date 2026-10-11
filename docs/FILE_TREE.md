@@ -133,6 +133,7 @@
     │   └── __tests__/                # 66 unit tests: round-trips, commands, history, persistence, selectors
     │
     ├── data/                        # Static datasets, preset themes & vector libraries
+    │   ├── encyclopediaData.ts      # Authoritative specifications for Geometry, Filters, Color Science & Standards
     │   ├── masterpieces.ts          # Curated SVG masterpieces with pre-parsed layers & palettes
     │   ├── palettes.ts              # Preset harmonic color palettes (Obsidian, Bauhaus, Cyber)
     │   ├── reusableComponents.ts    # Reusable SVG vector symbols, HUD dials & tech badges
@@ -144,6 +145,7 @@
         │   │   ├── clipPathBuilder.ts   # Procedural SVG <clipPath> masks, wipes & iris definitions
         │   │   └── keyframeGenerator.ts # CSS keyframes for the production SVG animation arsenal
         │   └── index.ts             # Master animation preset registry & procedural SVG injector
+        ├── encyclopediaPreviews.ts  # Algorithmic and kinetic live SVG visualizers for encyclopedia entries
         ├── gifRenderer.ts           # HTML5 Canvas frame-by-frame animated GIF exporter
         ├── spriteSheetRenderer.ts   # Multi-row vector animation sprite sheet generator
         ├── sanitizeSvg.ts           # DOM-based SVG sanitizer (authoritative render gate)
@@ -299,6 +301,7 @@ The authoritative editing model. SVG strings are inputs/outputs here, never the 
 
 | File / Path | Contents & Usage |
 | :--- | :--- |
+| **`src/data/encyclopediaData.ts`** | Master technical encyclopedia dataset defining structured specifications for SVG Path/Arc Geometry, Shader/Filter Pipelines, Oklab/OKLCH Color Science, and Inkscape Defense Standards. |
 | **`src/data/masterpieces.ts`** | Pre-computed, production-ready vector graphics with complete SVG markup, parsed layer groups, color swatches, and metadata tags. |
 | **`src/data/palettes.ts`** | Harmonic color definitions including Obsidian Terminal, Cyberpunk Neon, Bauhaus Primary, Solar Flare, Vaporwave Pastel, and Emerald Circuit. |
 | **`src/data/reusableComponents.ts`**| Library of modular vector primitives (HUD crosshairs, circular dials, circuit nodes, telemetry cards) ready for instant canvas injection. |
@@ -310,6 +313,7 @@ The authoritative editing model. SVG strings are inputs/outputs here, never the 
 
 | File / Path | Functionality |
 | :--- | :--- |
+| **`src/utils/encyclopediaPreviews.ts`** | Procedural SVG micro-generators providing live algorithmic and animated keyframe previews for all vectorization and motion presets in the encyclopedia. |
 | **`src/utils/svgParser.ts`** | Parses raw SVG strings into a clean DOM tree, extracts `<g>` groups and Inkscape layers, calculates path counts, identifies used color palettes, and validates viewBox coordinates. |
 | **`src/utils/svgAnimator.ts`** | Master SVG animation coordinator. Delegates extended animations to the modular kinetic engine while maintaining legacy preset compatibility. |
 | **`src/utils/gifRenderer.ts`** | Renders dynamic SVG animations frame-by-frame onto a hidden HTML5 canvas and compiles them into downloadable animated GIF binaries. |

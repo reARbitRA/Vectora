@@ -19,11 +19,11 @@ export const ANIMATION_EASINGS: { id: string; name: string; curve: string; categ
 ];
 
 export const DEFAULT_KEYFRAMES: KeyframeNode[] = [
-  { id: 'kf-0', percentage: 0, label: '0% Start', isRemovable: false },
-  { id: 'kf-25', percentage: 25, label: '25% Build', isRemovable: true },
-  { id: 'kf-50', percentage: 50, label: '50% Peak Wave', isRemovable: true },
-  { id: 'kf-75', percentage: 75, label: '75% Settle', isRemovable: true },
-  { id: 'kf-100', percentage: 100, label: '100% Loop Return', isRemovable: false },
+  { id: 'kf-0', percentage: 0, label: '0% Start Anchor', isRemovable: false, action: 'Origin', transform: { scale: 1, rotate: 0, translateX: 0, translateY: 0, opacity: 1 } },
+  { id: 'kf-25', percentage: 25, label: '25% Build Wave', isRemovable: true, action: 'Lift & Drift', transform: { scale: 1.08, rotate: 12, translateX: 10, translateY: -8, opacity: 0.95 } },
+  { id: 'kf-50', percentage: 50, label: '50% Peak Surge', isRemovable: true, action: 'Peak Dynamic', transform: { scale: 1.18, rotate: -15, translateX: -12, translateY: -20, opacity: 1 } },
+  { id: 'kf-75', percentage: 75, label: '75% Settle Glide', isRemovable: true, action: 'Harmonic Glide', transform: { scale: 1.05, rotate: 6, translateX: 5, translateY: -6, opacity: 0.9 } },
+  { id: 'kf-100', percentage: 100, label: '100% Loop Return', isRemovable: false, action: 'Loop Return', transform: { scale: 1, rotate: 0, translateX: 0, translateY: 0, opacity: 1 } },
 ];
 
 export interface AnimationPresetTemplate {
@@ -642,6 +642,28 @@ export function injectSvgAnimations(
       cssRules.push(`}`);
     });
 
+    // Custom Interactive Timeline Keyframe Rule Generation
+    if (config.keyframes && config.keyframes.length >= 2) {
+      const sortedKeys = config.keyframes.slice().sort((a, b) => a.percentage - b.percentage);
+      const keyframeCssStops = sortedKeys.map((kf) => {
+        const p = kf.percentage;
+        const t = kf.transform || {};
+        const scale = t.scale !== undefined ? t.scale : (1 + Math.sin((p / 100) * Math.PI * 2) * 0.1).toFixed(3);
+        const rotate = t.rotate !== undefined ? t.rotate : (Math.sin((p / 100) * Math.PI * 2) * 15).toFixed(1);
+        const tx = t.translateX !== undefined ? t.translateX : 0;
+        const ty = t.translateY !== undefined ? t.translateY : 0;
+        const opacity = t.opacity !== undefined ? t.opacity : 1;
+        const skewX = t.skewX !== undefined ? t.skewX : 0;
+        return `  ${p}% { transform: translate(${tx}px, ${ty}px) scale(${scale}) rotate(${rotate}deg) skewX(${skewX}deg); opacity: ${opacity}; }`;
+      }).join('\n');
+
+      cssRules.push(`/* Custom Interactive Keyframe Timeline Motion */`);
+      cssRules.push(`@keyframes vec-kf-timeline {\n${keyframeCssStops}\n}`);
+      cssRules.push(`.vec-anim-timeline {`);
+      cssRules.push(`  animation: vec-kf-timeline ${baseDuration}s var(--vec-easing) var(--vec-iteration) var(--vec-direction) !important;`);
+      cssRules.push(`}`);
+    }
+
     cssRules.push(``);
     cssRules.push(`/* Motion Blur / Echo Trails */`);
     cssRules.push(`.vec-trail-clone {`);
@@ -826,6 +848,8 @@ export function injectSvgAnimations(
  */
 export function getAnimClassForPreset(presetId: AnimationPresetId | 'none'): string {
   switch (presetId) {
+    case 'custom-timeline':
+      return 'vec-anim-timeline';
     case 'path-draw':
       return 'vec-anim-draw';
     case 'orbit-spin':
